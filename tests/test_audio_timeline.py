@@ -135,3 +135,10 @@ def test_layout_snap_past_tts_end_extends_end():
     assert before["end"] == pytest.approx(base + 0.6)
     assert after["start"] == pytest.approx(base + 0.65)
     assert after["end"] >= after["start"]
+
+
+def test_limit_sfx_caps_density():
+    from tools.audio_timeline import limit_sfx
+    ev = [[0.0, "pop", 1], [0.5, "pop", 1], [2.0, "whoosh", 1]] + [[2.0 + 2 * i, "pop", 1] for i in range(1, 8)]
+    kept = limit_sfx(ev)
+    assert [k[0] for k in kept] == [0.0, 4.0, 6.0, 8.0]   # 0.5 太近、whoosh 停用、pop 最多 4 个

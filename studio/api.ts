@@ -108,7 +108,7 @@ export function studioApi(root: string): Plugin {
     return {
       mix: { bgm: c.mix?.bgm ?? 1, sfx: c.mix?.sfx ?? {} }, voice: c.voice, voices: c.voices ?? [{ name: "温暖阿虎 2.0", speaker: c.voice?.speaker }], bgm: c.bgm ?? null,
       bgmFiles: files("assets/audio/bgm", /\.(mp3|wav|m4a)$/i),
-      sfx: [["pop", "弹出"], ["stamp", "盖章"], ["whoosh", "滑动"], ["tick", "滚动咔哒"], ["ding", "叮"]].map(([kind, name]) => ({ kind, name, uses: sfxUses[kind] ?? 0 })),
+      sfx: [["pop", "弹出"], ["stamp", "盖章"], ["tick", "滚动咔哒"], ["ding", "叮"]].map(([kind, name]) => ({ kind, name, uses: sfxUses[kind] ?? 0 })),
       poses: files("assets", /^pose_.+\.png$/), props: files("assets", /^prop_.+\.png$/),
       components: SHARED_COMPONENTS,
     };

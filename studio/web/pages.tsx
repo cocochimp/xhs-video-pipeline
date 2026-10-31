@@ -215,7 +215,7 @@ const SOURCES = {
     ["YouTube 音频库", "https://www.youtube.com/audiolibrary", "要登录 YouTube；标着「无需署名」的可直接用"],
   ],
   sfx: [
-    ["Pixabay 音效", "https://pixabay.com/sound-effects/", "可商用，不用署名；搜 pop、whoosh、ding、click"],
+    ["Pixabay 音效", "https://pixabay.com/sound-effects/", "可商用，不用署名；搜 pop、ding、click"],
     ["Mixkit 音效", "https://mixkit.co/free-sound-effects/", "可商用，不用署名；按类别分好了"],
     ["Freesound", "https://freesound.org/search/?f=license:%22Creative+Commons+0%22", "链接已筛选 CC0（无需署名），要注册才能下载"],
   ],

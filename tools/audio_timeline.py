@@ -7,7 +7,10 @@ import re
 FPS = 30
 TAIL = 0.25        # 每段最后一个字之后留的余量（秒）
 END_PAD = 1.2      # 全片最后留白（秒）
-ROLL_LEAD = 0.05   # 选题滚动在前一段配音结束后多久开始（秒）
+ROLL_LEAD = 0.05
+SFX_MAX = 8                       # 每期场景音效上限（选题滚动的咔哒不算）
+SFX_KIND_MAX = {"pop": 4, "stamp": 3}
+SFX_GAP = 1.5                     # 两个场景音效最少间隔（秒）   # 选题滚动在前一段配音结束后多久开始（秒）
 SNAP_AHEAD = 0.2   # 台词开始后这么短的时间内若出现停顿，说明 TTS 时间戳偏早，吸附到停顿结束
 
 
@@ -87,6 +90,7 @@ def expand_sfx(episode: dict, lines: list[dict], roll: dict | None) -> list[list
                 raise ValueError(f"场景 {sc['id']} 的音效指向不存在的第 {s['line']} 句")
             t = starts[sc["id"]][s["line"]] + s.get("offset", 0.0)
             out.append([round(max(0.0, t), 3), s["kind"], s["vol"]])
+    out = limit_sfx(sorted(out))
     if roll:
         n = len(roll["topics"])
         for j in range(1, n):
@@ -94,6 +98,21 @@ def expand_sfx(episode: dict, lines: list[dict], roll: dict | None) -> list[list
             final = j == n - 1
             out.append([round(roll["start"] + roll["dur"] * p, 3), "ding" if final else "tick", 0.9 if final else 0.7])
     return sorted(out)
+
+
+def limit_sfx(events: list[list]) -> list[list]:
+    """音效不能密：按时间先到先得，离上一个太近、这种用满了、总数满了的都去掉。"""
+    kept, used = [], {}
+    for t, kind, vol in events:
+        if kind not in SFX_KIND_MAX and kind in ("whoosh",):
+            continue  # 已停用的音效
+        if kept and t - kept[-1][0] < SFX_GAP:
+            continue
+        if used.get(kind, 0) >= SFX_KIND_MAX.get(kind, SFX_MAX) or len(kept) >= SFX_MAX:
+            continue
+        kept.append([t, kind, vol])
+        used[kind] = used.get(kind, 0) + 1
+    return kept
 
 
 def layout(episode: dict, seg_audio: dict, voice: dict) -> dict:

@@ -62,7 +62,7 @@ def cmd_text(ep_dir: Path, issue: str = "") -> dict:
         f"第二句 zh「这里是阿牛退休计划，第{before['no']}期」say「这里是阿牛退休计划第{before['no']}期！」(seg=open)；s02 第一句「本期我们要讲的是：」(seg=open)，第二句是选题 (seg=title)；"
         "正文 seg=body；最后一句固定为「关注阿牛，一起早日退休！」(seg=end)。"
         "每句 lines 有 seg、zh（字幕，重点词用【】标橙）、say（朗读，数字写汉字）；每个分镜有 id(s01…)、name、visual（画面描述）、"
-        "sfx（[{line, kind: pop|stamp|whoosh|tick|ding, vol}]）、status: pending、rounds: []。roll.topics 放 11 个别的选题，roll.dur 2.2。",
+        "sfx（[{line, kind: pop|stamp, vol}]，整期最多 8 个，pop 最多 4 个、stamp 最多 3 个，两个至少隔 1.5 秒，只放在最关键的数字或结论上）、status: pending、rounds: []。roll.topics 放 11 个别的选题，roll.dur 2.2。",
         "s01、s02 的 visual 和 sfx 照抄第 1 期。只改 scenes、roll、title 字段，其他字段保持原样。参考第 1 期的写法：\n" + example,
         '最后一行输出 {"summary": "<一句话说明>"}',
     ])

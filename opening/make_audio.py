@@ -111,7 +111,7 @@ def sfx_ding() -> np.ndarray:
     return sum(a * np.sin(2 * np.pi * fr * t) for fr, a in ((1318.5, 0.6), (2637, 0.25), (1975.5, 0.15))) * np.exp(-t / 0.25)
 
 
-SFX = {"pop": sfx_pop, "stamp": sfx_stamp, "whoosh": sfx_whoosh, "tick": sfx_tick, "ding": sfx_ding}
+SFX = {"pop": sfx_pop, "stamp": sfx_stamp, "tick": sfx_tick, "ding": sfx_ding}  # 「滑动」whoosh 已停用（太吵），函数留给开头复刻版
 
 
 def mix_config() -> dict:

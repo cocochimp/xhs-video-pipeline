@@ -1,7 +1,7 @@
 import type React from "react";
 
 export type Line = { seg: string; zh: string; say: string };
-export type Sfx = { line: number; kind: "pop" | "stamp" | "whoosh" | "tick" | "ding"; vol: number; offset?: number };
+export type Sfx = { line: number; kind: "pop" | "stamp" | "tick" | "ding"; vol: number; offset?: number };
 
 export type SceneData = {
   id: string;

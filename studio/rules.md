@@ -4,7 +4,7 @@
 
 ## 只能改
 - `episodes/<期>/scenes/<本片>.tsx`
-- `episodes/<期>/episode.json` 里**本片**的 `lines`（`zh` 字幕，`【】`标橙；`say` 朗读，数字写汉字）、`visual`、`sfx`（`{line, kind: pop|stamp|whoosh|tick|ding, vol, offset?}`）
+- `episodes/<期>/episode.json` 里**本片**的 `lines`（`zh` 字幕，`【】`标橙；`say` 朗读，数字写汉字）、`visual`、`sfx`（`{line, kind: pop|stamp, vol, offset?}`）。音效要少：整期最多 8 个，「弹出」最多 4 个、「盖章」最多 3 个，两个音效至少隔 1.5 秒，多出来的会被自动去掉，只放在最关键的那一下
 - 需要新素材时运行 `.venv/bin/python tools/gen_asset.py <英文名> "<中文描述>"`，生成 `assets/prop_<名>.png`（姿势用 `pose_<名>`），每张 0.12 元
 
 其他文件一律不改（其他场景、`shared/`、已有素材、全局配置）。越界会被自动还原。
