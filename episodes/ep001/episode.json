@@ -91,7 +91,8 @@
         }
       ],
       "updated": true,
-      "costWarn": false
+      "costWarn": false,
+      "voiceUpdated": false
     },
     {
       "id": "s02",
@@ -128,7 +129,8 @@
         }
       ],
       "updated": true,
-      "costWarn": false
+      "costWarn": false,
+      "voiceUpdated": false
     },
     {
       "id": "s03",
@@ -171,7 +173,10 @@
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": []
+      "rounds": [],
+      "updated": true,
+      "voiceUpdated": false,
+      "costWarn": false
     },
     {
       "id": "s04",
@@ -213,7 +218,10 @@
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": []
+      "rounds": [],
+      "updated": true,
+      "voiceUpdated": false,
+      "costWarn": false
     },
     {
       "id": "s05",
@@ -250,7 +258,10 @@
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": []
+      "rounds": [],
+      "updated": true,
+      "voiceUpdated": false,
+      "costWarn": false
     },
     {
       "id": "s06",
@@ -292,7 +303,10 @@
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": []
+      "rounds": [],
+      "updated": true,
+      "voiceUpdated": false,
+      "costWarn": false
     },
     {
       "id": "s07",
@@ -329,7 +343,10 @@
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": []
+      "rounds": [],
+      "updated": true,
+      "voiceUpdated": false,
+      "costWarn": false
     },
     {
       "id": "s08",
@@ -361,7 +378,10 @@
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": []
+      "rounds": [],
+      "updated": true,
+      "voiceUpdated": false,
+      "costWarn": false
     },
     {
       "id": "s09",
@@ -394,7 +414,10 @@
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": []
+      "rounds": [],
+      "updated": true,
+      "voiceUpdated": false,
+      "costWarn": false
     },
     {
       "id": "s10",
@@ -447,7 +470,10 @@
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": []
+      "rounds": [],
+      "updated": true,
+      "voiceUpdated": false,
+      "costWarn": false
     }
   ],
   "cost": {
