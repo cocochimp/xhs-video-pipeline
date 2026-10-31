@@ -237,7 +237,7 @@ const Preview: React.FC<{ mod: EpisodeModule; start: number; end: number; bgm: s
   return (
     <div className="player" data-ui>
       <Player ref={ref} component={C} durationInFrames={f(mod.timeline.duration)} fps={FPS} compositionWidth={1440} compositionHeight={1080}
-        style={{ width: "100%" }} controls />
+        style={{ width: "100%" }} controls numberOfSharedAudioTags={0} />
     </div>
   );
 };
