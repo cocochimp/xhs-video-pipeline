@@ -9,15 +9,37 @@ SCENE_FIELDS = ("lines", "visual", "sfx")      # AI 可以改的场景字段
 META_FIELDS = ("status", "rounds", "updated", "voiceUpdated", "costWarn", "textStatus")  # 网站维护的字段
 
 
-def snapshot(root: Path, ep_dir: Path) -> dict[str, str]:
-    """{相对路径: sha1}：本期目录（不含 audio/history/thumbs）、shared/、assets/、studio/config.json。"""
+def _files(root: Path, ep_dir: Path) -> list[Path]:
     files = [root / "studio/config.json"]
     for d in (root / "shared", root / "assets"):
         files += [p for p in d.rglob("*") if p.is_file()]
     files += [p for p in ep_dir.rglob("*") if p.is_file()
               and not {"audio", "history", "thumbs"} & set(p.relative_to(ep_dir).parts)]
-    return {str(p.relative_to(root)): hashlib.sha1(p.read_bytes()).hexdigest()
-            for p in files if p.exists() and not p.name.startswith(".")}
+    return [p for p in files if p.exists() and not p.name.startswith(".")]
+
+
+def capture(root: Path, ep_dir: Path) -> dict[str, bytes]:
+    """改片前的文件内容，用于还原越界改动。"""
+    return {str(p.relative_to(root)): p.read_bytes() for p in _files(root, ep_dir)}
+
+
+def revert(root: Path, saved: dict[str, bytes], paths: list[str]) -> None:
+    """把这些路径恢复成 saved 里的内容；saved 里没有的（新建的）删除。"""
+    for rel in paths:
+        p = root / rel
+        if rel in saved:
+            p.write_bytes(saved[rel])
+        else:
+            p.unlink(missing_ok=True)
+
+
+def changed(before: dict[str, str], after: dict[str, str]) -> list[str]:
+    return sorted(p for p in set(before) | set(after) if before.get(p) != after.get(p))
+
+
+def snapshot(root: Path, ep_dir: Path) -> dict[str, str]:
+    """{相对路径: sha1}：本期目录（不含 audio/history/thumbs）、shared/、assets/、studio/config.json。"""
+    return {str(p.relative_to(root)): hashlib.sha1(p.read_bytes()).hexdigest() for p in _files(root, ep_dir)}
 
 
 def _strip(ep: dict, keep_scene: str | None = None) -> dict:
