@@ -27,11 +27,11 @@ def fake_synth(calls):
 
 def test_first_build_synthesizes_every_segment(ep_dir):
     calls = []
-    tl, billed = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
+    tl, billed, _ = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
     assert [c[0] for c in calls] == ["开场。这期：", "标题？", "一二，三。"]
     assert all(c[1:] == ("x", 15) for c in calls)
     assert (ep_dir / "audio/timeline.json").exists()
-    assert (ep_dir / "audio/vo_body.mp3").exists()
+    assert list((ep_dir / "audio").glob("vo_body_*.mp3"))
     assert billed == len("开场。这期：标题？一二，三。")
     cost = json.loads((ep_dir / "episode.json").read_text())["cost"]["tts"]
     assert cost == pytest.approx(billed * PRICE)
@@ -41,7 +41,7 @@ def test_first_build_synthesizes_every_segment(ep_dir):
 def test_rebuild_uses_cache(ep_dir):
     calls = []
     build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
-    _, billed = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
+    _, billed, _ = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
     assert len(calls) == 3
     assert billed == 0
 
@@ -73,7 +73,7 @@ def test_failed_revoice_leaves_no_stale_words(ep_dir):
 
     with pytest.raises(RuntimeError):
         build(ep_dir, force=True, synth=bad_synth, voice=VOICE, sync_root=None, detect=lambda p: [])
-    assert not (ep_dir / "audio/words_body.json").exists()
+    assert not list((ep_dir / "audio").glob("words_body_*.json"))
     calls.clear()
     build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
     assert [c[0] for c in calls] == ["一二，三。"]
@@ -105,14 +105,30 @@ def test_cost_recorded_when_later_segment_fails(ep_dir):
 def test_cached_words_without_silences_detects_without_resynthesis(ep_dir):
     calls = []
     build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
-    wfile = ep_dir / "audio/words_body.json"
+    wfile = next((ep_dir / "audio").glob("words_body_*.json"))
     d = json.loads(wfile.read_text())
     del d["silences"]
     wfile.write_text(json.dumps(d))
     seen = []
-    _, billed = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None,
+    _, billed, _ = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None,
                       detect=lambda p: seen.append(p.name) or [[0.1, 0.2]])
     assert len(calls) == 3
     assert billed == 0
-    assert seen == ["vo_body.mp3"]
+    assert [n.split("_")[1] for n in seen] == ["body"]
     assert json.loads(wfile.read_text())["silences"] == [[0.1, 0.2]]
+
+
+def test_revert_reuses_old_version_without_billing(ep_dir):
+    calls = []
+    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
+    ep = json.loads((ep_dir / "episode.json").read_text())
+    orig = ep["scenes"][2]["lines"][1]["say"]
+    ep["scenes"][2]["lines"][1]["say"] = "三四。"
+    (ep_dir / "episode.json").write_text(json.dumps(ep, ensure_ascii=False))
+    _, _, rv = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
+    assert rv == ["body"]
+    ep = json.loads((ep_dir / "episode.json").read_text())
+    ep["scenes"][2]["lines"][1]["say"] = orig
+    (ep_dir / "episode.json").write_text(json.dumps(ep, ensure_ascii=False))
+    _, billed, rv = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
+    assert (billed, rv, len(calls)) == (0, [], 4)

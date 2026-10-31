@@ -3,7 +3,8 @@
   .venv/bin/python tools/build_audio.py episodes/ep001
   .venv/bin/python tools/build_audio.py episodes/ep001 --force   # 全部重配
 
-产物（episodes/<id>/audio/）：vo_<段>.mp3、words_<段>.json（逐字时间 + 缓存键）、timeline.json
+产物（episodes/<id>/audio/）：vo_<段>_<hash>.mp3、words_<段>_<hash>.json（逐字时间 + 停顿）、timeline.json
+按内容 hash 命名，旧版本保留：台词改回原样时直接复用，不再计费；预览也不会被浏览器缓存的旧音频干扰。
 """
 
 import argparse
@@ -44,7 +45,7 @@ def detect_silences(mp3: Path) -> list[list[float]]:
 
 def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = None, sync_root: Path | None = ROOT,
           detect=detect_silences):
-    """返回 (timeline, 本次计费字数)。"""
+    """返回 (timeline, 本次计费字数, 本次实际合成的段名列表)。"""
     if synth is None:
         import tts_doubao
         synth = tts_doubao.synth
@@ -55,11 +56,11 @@ def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = No
     speech = segment_speech(episode)
     # 先用假音频走一遍排版，音效越界、空台词等错误在计费前暴露
     layout(episode, {seg: {"duration": 1.0, "words": [], "hash": ""} for seg in speech}, voice)
-    seg_audio, billed = {}, 0
+    seg_audio, billed, revoiced = {}, 0, []
     try:
         for seg, text in speech.items():
             key = segment_hash(voice["speaker"], voice["rate"], text)
-            wfile, mp3 = audio / f"words_{seg}.json", audio / f"vo_{seg}.mp3"
+            wfile, mp3 = audio / f"words_{seg}_{key}.json", audio / f"vo_{seg}_{key}.mp3"
             cached = json.loads(wfile.read_text()) if wfile.exists() and mp3.exists() else None
             if force or not cached or cached["hash"] != key:
                 wfile.unlink(missing_ok=True)  # 合成失败时不能留下与新 mp3 不配套的旧缓存
@@ -69,6 +70,7 @@ def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = No
                 cached = {"hash": key, "words": [list(w) for w in words]}
                 wfile.write_text(json.dumps(cached, ensure_ascii=False))
                 billed += len(text)
+                revoiced.append(seg)
                 print(f"  配音 {seg}：{len(text)} 字")
             if "silences" not in cached:
                 cached["silences"] = detect(mp3)
@@ -84,7 +86,7 @@ def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = No
             (ep_dir / "episode.json").write_text(json.dumps(episode, ensure_ascii=False, indent=2) + "\n")
     if sync_root:
         sync(sync_root)
-    return tl, billed
+    return tl, billed, revoiced
 
 
 def main():
@@ -94,7 +96,7 @@ def main():
     a = ap.parse_args()
     import pipeline
     pipeline.load_env()
-    tl, billed = build(a.episode.resolve(), force=a.force)
+    tl, billed, _ = build(a.episode.resolve(), force=a.force)
     print(f"时长 {tl['duration']:.1f}s，{len(tl['scenes'])} 个场景，本次配音 {billed} 字（约 {billed * PRICE:.2f} 元）")
 
 

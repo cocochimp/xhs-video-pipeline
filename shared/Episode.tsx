@@ -35,7 +35,7 @@ export const Episode: React.FC<{ ep: EpisodeModule }> = ({ ep }) => {
         <TopBar />
         {Object.entries(timeline.segments).map(([id, s]) => (
           <Sequence key={id} from={f(s.start)} name={`配音 ${id}`}>
-            <Audio src={staticFile(`episodes/${episode.id}/audio/vo_${id}.mp3`)} />
+            <Audio src={staticFile(`episodes/${episode.id}/audio/vo_${id}_${s.hash}.mp3`)} />
           </Sequence>
         ))}
       </AbsoluteFill>
