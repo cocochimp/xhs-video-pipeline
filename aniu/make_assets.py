@@ -37,6 +37,19 @@ POSES = {  # 每张图从左到右三个姿势，名字按顺序
     "poses3": (["tired", "wave", "shrug"],
                "①抱着笔记本电脑，弯腰驼背，有黑眼圈，很疲惫；②面向观众笑着挥手打招呼；③双手摊开耸肩，表情无奈"),
 }
+SINGLE = {  # 一张图只画一个姿势：不用切分，也不会互相串细节
+    "pose_money": "双手捧着一叠钞票，眯眼开心地笑",
+    "pose_cry": "大哭，眼泪像两条小瀑布喷出来，一只手抹眼泪",
+    "pose_angry": "双手叉腰，气得跺脚，脸涨红，头顶冒出一小团黑烟",
+    "pose_run": "一手拎着黑色公文包向右侧奔跑，身体前倾，很着急，像在赶地铁",
+    "pose_type": "坐在一把办公椅上，面前一台打开的笔记本电脑放在腿上，认真打字",
+    "pose_lie": "仰面躺在地上伸展四肢，闭眼满足地微笑，像在躺平",
+    "pose_thumb": "竖起一只大拇指点赞，眨一只眼，自信微笑",
+    "pose_facepalm": "一只手捂住脸，很无语、很尴尬",
+    "pose_piggy": "双手抱着一个粉色存钱罐，满脸珍惜",
+    "pose_phone": "双手拿着手机看屏幕，被吓到，眼睛瞪大",
+    "pose_stop": "向前伸直一只手掌做“停”的手势，表情严肃认真",
+}
 PROPS = ["piggy", "moneybag", "coin", "calc", "calendar", "house",
          "takeout", "tea", "jar", "chart", "hourglass", "creditcard"]
 PROP_DESC = ("粉色存钱罐、装满钱的钱袋（印着¥）、金币（印着¥）、计算器、撕页日历、一栋小房子、"
@@ -49,6 +62,8 @@ def jobs():
     for name, (_, desc) in POSES.items():
         j[name] = (SHEET, f"{STYLE}\n{ANIU}\n{SAME}\n同一张图从左到右并排画三个互不接触的全身姿势，彼此之间留出大片空白：{desc}。"
                           "不要写任何文字。")
+    for name, desc in SINGLE.items():
+        j[name] = (SHEET, f"{STYLE}\n{ANIU}\n{SAME}\n只画一个全身姿势，居中，四周留白，不画尾巴：{desc}。不要写任何文字。")
     j["props"] = (None, f"{STYLE}\n道具素材表：排成整齐的3行4列网格，每个物品单独居中在自己的格子里，物品之间留大量空白、互不重叠，"
                         f"按从左到右、从上到下依次是：{PROP_DESC}。除了¥符号不要写任何文字，不要画格子线。")
     return j
@@ -78,18 +93,21 @@ def largest_blob(cell: Image.Image) -> Image.Image:
                             stack.append((nx, ny))
             if len(comp) > len(best):
                 best = comp
-    xs, ys = [x for x, _ in best], [y for _, y in best]
-    box = (max(0, min(xs) * s - 6), max(0, min(ys) * s - 6), min(cell.width, max(xs) * s + 10), min(cell.height, max(ys) * s + 10))
-    out = Image.new("RGB", cell.size, "white")
-    out.paste(cell.crop(box), box[:2])
-    return out
+    from PIL import ImageFilter
+    m = Image.new("L", (w, h), 0)  # 只保留最大那块（稍微膨胀），其他碎片涂白
+    for x, y in best:
+        m.putpixel((x, y), 255)
+    m = m.filter(ImageFilter.MaxFilter(5)).resize(cell.size)
+    return Image.composite(cell, Image.new("RGB", cell.size, "white"), m)
 
 
 def split(name: str, raw: Path):
     img = Image.open(raw).convert("RGB")
     if name in POSES:
         for label, part in zip(POSES[name][0], components(img, 3)):
-            cutout(part).save(PUB / f"pose_{label}.png")
+            cutout(largest_blob(part)).save(PUB / f"pose_{label}.png")  # 去掉相邻姿势伸进来的手和牌子
+    elif name in SINGLE:
+        cutout(largest_blob(img)).save(PUB / f"{name}.png")
     elif name == "props":
         for label, cell in zip(PROPS, grid(img, 4, 3)):
             cutout(largest_blob(cell), outline=7).save(PUB / f"prop_{label}.png")
@@ -108,6 +126,7 @@ def main():
             continue
         raw = RAW / f"{name}.jpg"
         if not raw.exists() or name in a.force:
+            P.IMAGE_SIZE = "1024x1024" if name in SINGLE else "1440x1080"
             P.seedream(prompt, raw, ref=ref)
             print("  生成", raw.name)
         split(name, raw)
