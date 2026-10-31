@@ -12,6 +12,15 @@
 
 **后续计划：** 计划 2 = 审片网站（任务队列、Claude Code 改片与越界检查、逐片审片页）；计划 3 = 新建一期四步流程（选题、文本、生成）。
 
+
+> **执行记录（2026-10-31）：** 本计划已按子代理方式执行完毕，分支 `plan1-episode-structure`。执行中经审查修正、与最初计划不同的地方：
+> - 逐字对齐改为 `difflib` 全局序列匹配；台词开始时间吸附到配音停顿结束（`snap_start`，停顿由 ffmpeg 检测并缓存在 `words_<段>.json` 的 `silences`）。
+> - `build()` 先用假音频校验再计费，失败时也记录已花费用，重配前删除旧缓存；新增 `detect=` 参数。
+> - 同步跳过隐藏文件；`.gitignore` 只忽略根目录 `/public/`；删除重复的 `aniu/public/`。
+> - 混音给人声补静音（`apad`），背景音乐不再在最后一句后中断；渲染前校验时间轴与台词一致。
+> - 下面的代码块已同步为最终代码。迁移校验的旧时间轴用 `git show bc96c1b:episode/public/timeline.json > /tmp/old_timeline.json` 取回。
+> - 留给计划 2：配音按内容寻址保留多个版本（撤销/预览需要）、单句结束时间、`build()` 返回重配了哪些段。
+
 ---
 
 ## 文件结构
@@ -233,6 +242,39 @@ def test_char_times_recovers_after_unmatched_word():
     assert st[4] == pytest.approx(0.2)
     assert en[-1] == pytest.approx(1.4)
     assert st == sorted(st)
+
+
+def test_snap_start_moves_start_to_pause_end():
+    from tools.audio_timeline import snap_start
+    assert snap_start(19.04, [[19.14, 19.69]]) == 19.69   # 停顿在开始后不久出现
+    assert snap_start(5.46, [[4.97, 5.55]]) == 5.55       # 开始落在停顿里
+    assert snap_start(2.48, [[2.02, 2.45]]) == 2.48       # 停顿已经结束，不动
+    assert snap_start(1.0, [[1.5, 2.0]]) == 1.0           # 停顿太远，不动
+
+
+def test_layout_snaps_line_start_to_silence_end():
+    ep = make_episode()
+    audio = fake_seg_audio(ep)
+    before = layout(ep, audio, VOICE)
+    audio["body"]["silences"] = [[0.35, 0.55]]
+    after = layout(ep, audio, VOICE)
+    b = {(l["scene"], l["i"]): l["start"] for l in before["lines"]}
+    a = {(l["scene"], l["i"]): l["start"] for l in after["lines"]}
+    moved = {k for k in a if a[k] != b[k]}
+    assert moved == {("s03", 1)}
+    assert a[("s03", 1)] == pytest.approx(b[("s03", 1)] - 0.4 + 0.55)
+
+
+def test_layout_snap_past_tts_end_extends_end():
+    ep = make_episode()
+    audio = fake_seg_audio(ep)
+    before = {(l["scene"], l["i"]): l for l in layout(ep, audio, VOICE)["lines"]}[("s03", 1)]
+    audio["body"]["silences"] = [[0.45, 0.65]]   # 停顿在 TTS 开始后 0.05s 出现，TTS 结束落在停顿里
+    after = {(l["scene"], l["i"]): l for l in layout(ep, audio, VOICE)["lines"]}[("s03", 1)]
+    base = before["start"] - 0.4
+    assert before["end"] == pytest.approx(base + 0.6)
+    assert after["start"] == pytest.approx(base + 0.65)
+    assert after["end"] >= after["start"]
 ```
 
 - [ ] **Step 4: 运行测试，确认失败**
@@ -257,6 +299,7 @@ FPS = 30
 TAIL = 0.25        # 每段最后一个字之后留的余量（秒）
 END_PAD = 1.2      # 全片最后留白（秒）
 ROLL_LEAD = 0.05   # 选题滚动在前一段配音结束后多久开始（秒）
+SNAP_AHEAD = 0.2   # 台词开始后这么短的时间内若出现停顿，说明 TTS 时间戳偏早，吸附到停顿结束
 
 
 def norm(s: str) -> str:
@@ -285,6 +328,14 @@ def char_times(speech: str, words) -> tuple[list[float], list[float]]:
             st[i] = en[i] = last
         last = en[i]
     return st, en
+
+
+def snap_start(t: float, silences: list[list[float]]) -> float:
+    """t 落在某段停顿里，或某段停顿在 t 之后 SNAP_AHEAD 秒内开始 → 返回该停顿的结束时间；否则原样返回。"""
+    for s, e in silences:
+        if s - SNAP_AHEAD <= t <= e:
+            return e
+    return t
 
 
 def segment_speech(episode: dict) -> dict[str, str]:
@@ -364,8 +415,10 @@ def layout(episode: dict, seg_audio: dict, voice: dict) -> dict:
             n, k = len(norm(ln["say"])), pos[seg]
             if n == 0:
                 raise ValueError(f"场景 {sc['id']} 第 {i} 句朗读文本为空")
+            start = base + snap_start(st[k], seg_audio[seg].get("silences", []))
+            end = max(base + en[k + n - 1], start)   # TTS 的结束时间可能和开始一样偏早
             lines.append({"scene": sc["id"], "i": i, "seg": seg, "zh": ln["zh"],
-                          "start": round(base + st[k], 3), "end": round(base + en[k + n - 1], 3)})
+                          "start": round(start, 3), "end": round(end, 3)})
             pos[seg] = k + n
 
     first: dict[str, float] = {}
@@ -446,6 +499,15 @@ def test_sync_recopies_same_size_file_with_older_mtime(tmp_path):
     os.utime(src, (old, old))
     assert sync(tmp_path) == 1
     assert (tmp_path / "public/assets/a.png").read_bytes() == b"pnx"
+
+
+def test_sync_skips_hidden_files(tmp_path):
+    _setup(tmp_path)
+    (tmp_path / "assets" / ".DS_Store").write_bytes(b"x")
+    (tmp_path / "episodes/ep001/audio/.hidden.mp3").write_bytes(b"x")
+    assert sync(tmp_path) == 2
+    assert not (tmp_path / "public/assets/.DS_Store").exists()
+    assert not (tmp_path / "public/episodes/ep001/audio/.hidden.mp3").exists()
 ```
 
 - [ ] **Step 2: 运行测试，确认失败**
@@ -478,10 +540,10 @@ def _copy_if_changed(src: Path, dst: Path) -> bool:
 def sync(root: Path) -> int:
     pub, n = root / "public", 0
     for f in sorted((root / "assets").glob("*")):
-        if f.is_file():
+        if f.is_file() and not f.name.startswith("."):
             n += _copy_if_changed(f, pub / "assets" / f.name)
     for ep in sorted(p for p in (root / "episodes").glob("ep*") if p.is_dir()):
-        for f in sorted((ep / "audio").glob("*.mp3")):
+        for f in sorted(p for p in (ep / "audio").glob("*.mp3") if not p.name.startswith(".")):
             n += _copy_if_changed(f, pub / "episodes" / ep.name / "audio" / f.name)
     return n
 
@@ -551,7 +613,7 @@ def fake_synth(calls):
 
 def test_first_build_synthesizes_every_segment(ep_dir):
     calls = []
-    tl, billed = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
+    tl, billed = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
     assert [c[0] for c in calls] == ["开场。这期：", "标题？", "一二，三。"]
     assert all(c[1:] == ("x", 15) for c in calls)
     assert (ep_dir / "audio/timeline.json").exists()
@@ -564,42 +626,42 @@ def test_first_build_synthesizes_every_segment(ep_dir):
 
 def test_rebuild_uses_cache(ep_dir):
     calls = []
-    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
-    _, billed = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
+    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
+    _, billed = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
     assert len(calls) == 3
     assert billed == 0
 
 
 def test_line_change_only_revoices_its_segment(ep_dir):
     calls = []
-    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
+    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
     ep = json.loads((ep_dir / "episode.json").read_text())
     ep["scenes"][2]["lines"][1]["say"] = "三四。"
     (ep_dir / "episode.json").write_text(json.dumps(ep, ensure_ascii=False))
-    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
+    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
     assert [c[0] for c in calls[3:]] == ["一二，三四。"]
 
 
 def test_voice_change_revoices_all(ep_dir):
     calls = []
-    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
-    build(ep_dir, synth=fake_synth(calls), voice={"speaker": "x", "rate": 20}, sync_root=None)
+    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
+    build(ep_dir, synth=fake_synth(calls), voice={"speaker": "x", "rate": 20}, sync_root=None, detect=lambda p: [])
     assert len(calls) == 6
 
 
 def test_failed_revoice_leaves_no_stale_words(ep_dir):
     calls = []
-    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
+    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
 
     def bad_synth(text, out_path, speaker, speech_rate):
         Path(out_path).write_bytes(b"ID3new")
         return [] if text == "一二，三。" else words_for(text)
 
     with pytest.raises(RuntimeError):
-        build(ep_dir, force=True, synth=bad_synth, voice=VOICE, sync_root=None)
+        build(ep_dir, force=True, synth=bad_synth, voice=VOICE, sync_root=None, detect=lambda p: [])
     assert not (ep_dir / "audio/words_body.json").exists()
     calls.clear()
-    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
+    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
     assert [c[0] for c in calls] == ["一二，三。"]
 
 
@@ -609,7 +671,7 @@ def test_invalid_episode_fails_before_any_tts(ep_dir):
     (ep_dir / "episode.json").write_text(json.dumps(ep, ensure_ascii=False))
     calls = []
     with pytest.raises(ValueError):
-        build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
+        build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
     assert calls == []
 
 
@@ -621,9 +683,25 @@ def test_cost_recorded_when_later_segment_fails(ep_dir):
         return words_for(text)
 
     with pytest.raises(OSError):
-        build(ep_dir, synth=flaky, voice=VOICE, sync_root=None)
+        build(ep_dir, synth=flaky, voice=VOICE, sync_root=None, detect=lambda p: [])
     cost = json.loads((ep_dir / "episode.json").read_text())["cost"]["tts"]
     assert cost == pytest.approx(len("开场。这期：") * PRICE)
+
+
+def test_cached_words_without_silences_detects_without_resynthesis(ep_dir):
+    calls = []
+    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None, detect=lambda p: [])
+    wfile = ep_dir / "audio/words_body.json"
+    d = json.loads(wfile.read_text())
+    del d["silences"]
+    wfile.write_text(json.dumps(d))
+    seen = []
+    _, billed = build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None,
+                      detect=lambda p: seen.append(p.name) or [[0.1, 0.2]])
+    assert len(calls) == 3
+    assert billed == 0
+    assert seen == ["vo_body.mp3"]
+    assert json.loads(wfile.read_text())["silences"] == [[0.1, 0.2]]
 ```
 
 - [ ] **Step 2: 运行测试，确认失败**
@@ -656,6 +734,8 @@ Expected: FAIL，`ModuleNotFoundError: No module named 'tools.build_audio'`
 
 import argparse
 import json
+import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -672,7 +752,24 @@ def load_voice() -> dict:
     return json.loads((ROOT / "studio/config.json").read_text())["voice"]
 
 
-def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = None, sync_root: Path | None = ROOT):
+def detect_silences(mp3: Path) -> list[list[float]]:
+    """用 ffmpeg silencedetect 找出音频里的停顿 [[开始, 结束], ...]（秒）；末尾没结束的停顿丢弃。"""
+    import imageio_ffmpeg
+    r = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-hide_banner", "-i", str(mp3),
+                        "-af", "silencedetect=noise=-40dB:d=0.12", "-f", "null", "-"],
+                       capture_output=True, text=True, check=True)
+    out, start = [], None
+    for m in re.finditer(r"silence_(start|end): (-?[\d.]+)", r.stderr):
+        if m.group(1) == "start":
+            start = float(m.group(2))
+        elif start is not None:
+            out.append([round(start, 3), round(float(m.group(2)), 3)])
+            start = None
+    return out
+
+
+def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = None, sync_root: Path | None = ROOT,
+          detect=detect_silences):
     """返回 (timeline, 本次计费字数)。"""
     if synth is None:
         import tts_doubao
@@ -699,8 +796,11 @@ def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = No
                 wfile.write_text(json.dumps(cached, ensure_ascii=False))
                 billed += len(text)
                 print(f"  配音 {seg}：{len(text)} 字")
+            if "silences" not in cached:
+                cached["silences"] = detect(mp3)
+                wfile.write_text(json.dumps(cached, ensure_ascii=False))
             words = [tuple(w) for w in cached["words"]]
-            seg_audio[seg] = {"duration": words[-1][1] + TAIL, "words": words, "hash": key}
+            seg_audio[seg] = {"duration": words[-1][1] + TAIL, "words": words, "hash": key, "silences": cached["silences"]}
         tl = layout(episode, seg_audio, voice)
         (audio / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1))
     finally:
@@ -825,7 +925,124 @@ Expected: `22`（9 个姿势 + 12 个道具 + 1 个头像）
 `aniu/make_assets.py` 中把：
 
 ```python
-RAW, PUB = ROOT / "raw", ROOT / "public"
+"""阿牛素材库：角色设定图 → 姿势库 / 道具库（一张图多个素材，自动抠图切开，flash 0.12 元/张）。
+
+  ../.venv/bin/python make_assets.py                 # 生成缺失的
+  ../.venv/bin/python make_assets.py --force poses1  # 重画某一张
+产物：raw/*.jpg（原图）、public/pose_<名>.png、public/prop_<名>.png（透明底贴纸）
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+from PIL import Image
+
+ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT.parent))
+sys.path.insert(0, str(ROOT.parent / "opening"))
+import pipeline as P  # noqa: E402
+from make_assets import components, cutout, grid  # noqa: E402  复用抠图/切分
+
+RAW, PUB = ROOT / "raw", ROOT.parent / "assets"
+CONCEPT = ROOT.parent / "ip/concepts/A-奶牛打工人.jpg"
+SHEET = RAW / "character.jpg"
+
+STYLE = ("手绘马克笔漫画风，粗黑色略带抖动的轮廓线，马克笔上色能看到笔触，纯白背景，没有地面阴影。"
+         "配色只用：黑、白、橙色(#FF8A3D)、浅灰、粉色(鼻子和耳朵内侧)。")
+ANIU = ("角色「阿牛」：拟人化的黑白花纹小奶牛，像人一样站立，Q版大头小身体（头约占身高的五分之二），"
+        "圆头，两只米色小短角，粉色大鼻子，黑色豆豆眼，身上黑色斑块的位置固定（左耳周围一块、右眼上方一块），"
+        "穿略皱的白衬衫和深灰色西裤，黑色蹄子，脖子上挂橙色挂绳的白色工牌。")
+SAME = "必须与参考图中的阿牛完全一致：花纹位置、角、鼻子、衬衫、工牌都不能变。"
+
+POSES = {  # 每张图从左到右三个姿势，名字按顺序
+    "poses1": (["sign", "shock", "point"],
+               "①双手在头顶举着一块空白的白色长方形牌子（牌子正对前方、上面什么都不写），开心；"
+               "②被吓到，双手抱头，眼睛瞪圆，嘴巴张大；③侧身伸出一只手指向画面右侧，自信地讲解"),
+    "poses2": (["think", "cheer", "calc"],
+               "①一只手托着下巴思考，眼睛看向上方；②双手高举欢呼，开心大笑；③双手捧着一个计算器认真按着，表情专注"),
+    "poses3": (["tired", "wave", "shrug"],
+               "①抱着笔记本电脑，弯腰驼背，有黑眼圈，很疲惫；②面向观众笑着挥手打招呼；③双手摊开耸肩，表情无奈"),
+}
+PROPS = ["piggy", "moneybag", "coin", "calc", "calendar", "house",
+         "takeout", "tea", "jar", "chart", "hourglass", "creditcard"]
+PROP_DESC = ("粉色存钱罐、装满钱的钱袋（印着¥）、金币（印着¥）、计算器、撕页日历、一栋小房子、"
+             "外卖纸袋、一杯珍珠奶茶、一个装着一半硬币的玻璃罐、向上增长的柱状图、沙漏、一张信用卡")
+
+
+def jobs():
+    j = {"character": (CONCEPT, f"{STYLE}\n{ANIU}\n角色设定图：同一张图从左到右并排画阿牛的正面、侧面、背面三个全身站姿，"
+                                f"彼此之间留出大片空白，表情平静微笑。参考图是这个角色的概念设计，严格沿用它的造型。不要写任何文字。")}
+    for name, (_, desc) in POSES.items():
+        j[name] = (SHEET, f"{STYLE}\n{ANIU}\n{SAME}\n同一张图从左到右并排画三个互不接触的全身姿势，彼此之间留出大片空白：{desc}。"
+                          "不要写任何文字。")
+    j["props"] = (None, f"{STYLE}\n道具素材表：排成整齐的3行4列网格，每个物品单独居中在自己的格子里，物品之间留大量空白、互不重叠，"
+                        f"按从左到右、从上到下依次是：{PROP_DESC}。除了¥符号不要写任何文字，不要画格子线。")
+    return j
+
+
+def largest_blob(cell: Image.Image) -> Image.Image:
+    """只保留格子里最大的一块图形，去掉邻格伸进来的碎片（比如存钱罐的尾巴）。"""
+    s = 4
+    g = cell.convert("L").resize((cell.width // s, cell.height // s))
+    w, h = g.size
+    ink = [[g.getpixel((x, y)) < 230 for x in range(w)] for y in range(h)]
+    seen, best = [[False] * w for _ in range(h)], []
+    for y0 in range(h):
+        for x0 in range(w):
+            if not ink[y0][x0] or seen[y0][x0]:
+                continue
+            stack, comp = [(x0, y0)], []
+            seen[y0][x0] = True
+            while stack:
+                x, y = stack.pop()
+                comp.append((x, y))
+                for dx in range(-2, 3):  # 允许 2 像素的缝，线条断开处不会被切成两块
+                    for dy in range(-2, 3):
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < w and 0 <= ny < h and ink[ny][nx] and not seen[ny][nx]:
+                            seen[ny][nx] = True
+                            stack.append((nx, ny))
+            if len(comp) > len(best):
+                best = comp
+    xs, ys = [x for x, _ in best], [y for _, y in best]
+    box = (max(0, min(xs) * s - 6), max(0, min(ys) * s - 6), min(cell.width, max(xs) * s + 10), min(cell.height, max(ys) * s + 10))
+    out = Image.new("RGB", cell.size, "white")
+    out.paste(cell.crop(box), box[:2])
+    return out
+
+
+def split(name: str, raw: Path):
+    img = Image.open(raw).convert("RGB")
+    if name in POSES:
+        for label, part in zip(POSES[name][0], components(img, 3)):
+            cutout(part).save(PUB / f"pose_{label}.png")
+    elif name == "props":
+        for label, cell in zip(PROPS, grid(img, 4, 3)):
+            cutout(largest_blob(cell), outline=7).save(PUB / f"prop_{label}.png")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--force", nargs="*", default=[])
+    ap.add_argument("--only", nargs="*", help="只处理这些图")
+    a = ap.parse_args()
+    P.load_env()
+    RAW.mkdir(exist_ok=True)
+    PUB.mkdir(exist_ok=True)
+    for name, (ref, prompt) in jobs().items():
+        if a.only and name not in a.only:
+            continue
+        raw = RAW / f"{name}.jpg"
+        if not raw.exists() or name in a.force:
+            P.seedream(prompt, raw, ref=ref)
+            print("  生成", raw.name)
+        split(name, raw)
+    print("素材 →", PUB)
+
+
+if __name__ == "__main__":
+    main()
 ```
 
 改为：
@@ -1118,22 +1335,28 @@ import React from "react";
 import { AbsoluteFill, Audio, Sequence, staticFile } from "remotion";
 import { EpisodeCtx } from "./context";
 import { Paper, Subtitles, TopBar } from "./Frame";
-import { f } from "./theme";
+import { f, FPS } from "./theme";
 import type { EpisodeModule } from "./types";
 
 /** 每个场景放进自己的 <Sequence>，场景里 useCurrentFrame() 从 0 开始 */
 export const Episode: React.FC<{ ep: EpisodeModule }> = ({ ep }) => {
   const { episode, timeline, scenes } = ep;
+  if (timeline.fps !== FPS) throw new Error(`timeline.json 帧率 ${timeline.fps} 与 FPS ${FPS} 不一致`);
   return (
     <EpisodeCtx.Provider value={{ episode, timeline }}>
       <AbsoluteFill>
         <Paper />
         {episode.scenes.map((sc) => {
           const span = timeline.scenes[sc.id];
+          if (!span) throw new Error(`场景 ${sc.id} 不在 timeline.json 里，先运行 tools/build_audio.py`);
+          if (!scenes[sc.id]) throw new Error(`场景 ${sc.id} 没有对应的场景组件`);
           const from = f(span.start);
           const dur = Math.max(1, f(span.end) - from);
           const starts = timeline.lines.filter((l) => l.scene === sc.id).map((l) => f(l.start) - from);
-          const at = (i: number) => (i < starts.length ? starts[i] : dur);
+          const at = (i: number) => {
+            if (i < 0 || i > starts.length) throw new Error(`场景 ${sc.id} 没有第 ${i} 句（共 ${starts.length} 句）`);
+            return i < starts.length ? starts[i] : dur;
+          };
           const Scene = scenes[sc.id];
           return (
             <Sequence key={sc.id} from={from} durationInFrames={dur} name={`${sc.id} ${sc.name}`}>
@@ -1599,7 +1822,7 @@ const S10: React.FC<SceneProps> = ({ at }) => {
   return (
     <AbsoluteFill>
       {ask ? (
-        <Pose name="sign" x={720} h={760} at={Math.max(0, at(0) - 4)} sign={<span>你的数字<span style={{ color: ORANGE }}>是？</span></span>} />
+        <Pose name="sign" x={720} h={760} at={at(0) - 4} sign={<span>你的数字<span style={{ color: ORANGE }}>是？</span></span>} />
       ) : (
         <>
           <Pose name="wave" x={420} h={680} at={at(2)} />
@@ -1735,11 +1958,33 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from tools.audio_timeline import segment_hash, segment_speech  # noqa: E402
 from tools.sync_public import sync  # noqa: E402
 
 
+def check_timeline(episode: dict, timeline: dict, voice: dict, dir_name: str) -> None:
+    """时间轴必须和当前 episode.json、音色一致，否则渲染出来的字幕和配音会对不上。"""
+    if episode["id"] != dir_name:
+        raise RuntimeError(f"episode.json 的 id（{episode['id']}）与目录名（{dir_name}）不一致")
+    stale = []
+    for seg, text in segment_speech(episode).items():
+        have = timeline.get("segments", {}).get(seg, {}).get("hash")
+        if have != segment_hash(voice["speaker"], voice["rate"], text):
+            stale.append(f"配音段 {seg}")
+    want = [(sc["id"], i, ln["zh"]) for sc in episode["scenes"] for i, ln in enumerate(sc["lines"])]
+    got = [(ln["scene"], ln["i"], ln["zh"]) for ln in timeline.get("lines", [])]
+    if want != got:
+        stale.append("台词/字幕")
+    if stale:
+        raise RuntimeError(f"timeline.json 已过期（{'、'.join(stale)}与 episode.json 不一致），先运行 tools/build_audio.py")
+
+
 def render(ep_dir: Path, draft: bool = False) -> Path:
-    eid = json.loads((ep_dir / "episode.json").read_text())["id"]
+    episode = json.loads((ep_dir / "episode.json").read_text())
+    timeline = json.loads((ep_dir / "audio/timeline.json").read_text())
+    voice = json.loads((ROOT / "studio/config.json").read_text())["voice"]
+    check_timeline(episode, timeline, voice, ep_dir.name)
+    eid = episode["id"]
     out = ROOT / "out" / eid
     out.mkdir(parents=True, exist_ok=True)
     sync(ROOT)
@@ -1800,7 +2045,8 @@ git commit -m "渲染整期工具：同步素材 → Remotion 渲染 → 混音"
 ```python
 """迁移校验：每个场景在旧版成片和新版成片里各取一帧（场景结束前 0.3 秒），并排对比。
 
-  .venv/bin/python tools/compare_frames.py episode/out/ep1.mp4 episode/public/timeline.json out/ep001/ep001.mp4 episodes/ep001
+  git show bc96c1b:episode/public/timeline.json > /tmp/old_timeline.json   # 旧时间轴（旧工程已删除，从 git 历史取）
+  .venv/bin/python tools/compare_frames.py out/legacy/ep1.mp4 /tmp/old_timeline.json out/ep001/ep001.mp4 episodes/ep001
 
 输出 out/ep001/compare.jpg；任一场景平均灰度差 > 14 时退出码为 1。
 旧时间轴的 subs 与新 episode.json 的台词一一对应（共 27 句），据此算出旧版各场景的结束时间。
@@ -1872,7 +2118,7 @@ if __name__ == "__main__":
 
 - [ ] **Step 2: 运行对比**
 
-Run: `.venv/bin/python tools/compare_frames.py episode/out/ep1.mp4 episode/public/timeline.json out/ep001/ep001.mp4 episodes/ep001; echo "exit $?"`
+Run: `.venv/bin/python tools/compare_frames.py out/legacy/ep1.mp4 /tmp/old_timeline.json out/ep001/ep001.mp4 episodes/ep001; echo "exit $?"`
 Expected: 10 行 `s01 … s10 差异 x.x ok`，最后 `exit 0`
 
 如果有场景标 `⚠ 超出`：打开 `out/ep001/compare.jpg` 看那一行左右两张图的差别，回到 Task 7 对照换算规则修正对应的场景文件，重新执行 Task 8 Step 2 和本步骤。
@@ -1942,7 +2188,7 @@ npm run video:studio                                    # 在 Remotion Studio �
 - [ ] **Step 4: 全量验证**
 
 Run: `.venv/bin/python -m pytest tests -q && npx tsc -p . && echo ALL_OK`
-Expected: `23 passed` 和 `ALL_OK`
+Expected: `33 passed` 和 `ALL_OK`
 
 - [ ] **Step 5: Commit 并推送**
 
