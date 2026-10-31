@@ -123,10 +123,10 @@ const GenStep: React.FC<{ ep: Ep; job?: Job }> = ({ ep, job }) => {
 
 const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) => {
   const mod = EPISODES.find((m) => m.episode.id === ep.id);
-  const [sel, setSel] = useState(ep.scenes[0]?.id);
-  const [whole, setWhole] = useState(false);
+  const [sel, setSel] = useState("all");
   const [issue, setIssue] = useState("");
   if (!mod) return <div className="empty">这一期的分镜代码还没注册。到「生成」里重试一次。</div>;
+  const whole = sel === "all";
   const sc = ep.scenes.find((s) => s.id === sel) ?? ep.scenes[0];
   const ok = ep.scenes.filter((s) => s.status === "approved").length;
   const span = mod.timeline.scenes[sc.id];
@@ -134,7 +134,7 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
   const rendering = running(renderJob);
   const dur = mod.timeline.duration;
   const submit = () => issue.trim() && api(`episodes/${ep.id}/scenes/${sc.id}/edit`, { issue }).then(() => setIssue(""));
-  const next = () => { const n = ep.scenes.find((s) => s.status !== "approved" && s.id !== sc.id); if (n) setSel(n.id); };
+  const next = () => { const n = ep.scenes.find((s) => s.status !== "approved" && s.id !== sc.id); setSel(n ? n.id : "all"); };
   const [label, cls] = STATUS[sc.status] ?? [sc.status, ""];
 
   return (
@@ -142,18 +142,23 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
       <div className="strip" role="tablist" aria-label="分镜">
         {ep.scenes.map((s) => {
           const sp = mod.timeline.scenes[s.id];
-          return <button key={s.id} style={{ flex: sp ? sp.end - sp.start : 1 }} className={`${s.status} ${s.id === sc.id ? "on" : ""}`} onClick={() => setSel(s.id)} title={`${s.id} ${s.name}`}>{s.id}</button>;
+          return <button key={s.id} style={{ flex: sp ? sp.end - sp.start : 1 }} className={`${s.status} ${!whole && s.id === sc.id ? "on" : ""}`} onClick={() => setSel(s.id)} title={`${s.id} ${s.name}`}>{s.id}</button>;
         })}
       </div>
       <div className="stripmeta num"><span>已通过 {ok} / {ep.scenes.length} 片</span><span>{dur.toFixed(1)} 秒</span></div>
 
       <div className="grid" style={{ gridTemplateColumns: "300px 1fr", alignItems: "start" }}>
         <div className="scenes">
+          <div className={`scene ${whole ? "on" : ""}`} onClick={() => setSel("all")}>
+            <img src={`/thumbs/${ep.id}/${ep.scenes[0].id}.jpg`} alt="" />
+            <div className="t"><div><b>完整视频</b> <span className="muted num small">{dur.toFixed(1)}s</span></div>
+              <div style={{ margin: "2px 0" }}><span className={`pill ${ok === ep.scenes.length ? "pos" : ""}`}>已通过 {ok}/{ep.scenes.length}</span></div><div>从头播到尾</div></div>
+          </div>
           {ep.scenes.map((s) => {
             const sp = mod.timeline.scenes[s.id];
             const [l, c] = STATUS[s.status] ?? [s.status, ""];
             return (
-              <div key={s.id} className={`scene ${s.id === sc.id ? "on" : ""}`} onClick={() => setSel(s.id)}>
+              <div key={s.id} className={`scene ${!whole && s.id === sc.id ? "on" : ""}`} onClick={() => setSel(s.id)}>
                 <img src={`/thumbs/${ep.id}/${s.id}.jpg?${s.rounds?.length ?? 0}`} alt="" />
                 <div className="t">
                   <div><b>{s.name}</b> <span className="muted num small">{sp ? (sp.end - sp.start).toFixed(1) : "?"}s</span></div>
@@ -168,7 +173,7 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
         <div>
           <Preview mod={mod} start={whole ? 0 : Math.max(0, span.start - 0.5)} end={whole ? dur : Math.min(dur, span.end + 0.5)} />
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "8px 0 var(--gap)" }}>
-            <label className="small"><input type="checkbox" checked={whole} onChange={(e) => setWhole(e.target.checked)} /> 整期播放</label>
+            <span className="small muted">{whole ? "完整视频" : `${sc.id} ${sc.name}，前后各多放 0.5 秒`}</span>
             <span className="sp" />
             <button className="btn" disabled={rendering} onClick={() => api(`episodes/${ep.id}/render`, { draft: true })}>渲染草稿</button>
             <button className="btn primary" disabled={ok < ep.scenes.length || rendering} onClick={() => api(`episodes/${ep.id}/render`, {})}>
@@ -176,7 +181,7 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
           </div>
           {renderJob?.state === "error" && <div className="notice neg" style={{ marginBottom: 12 }}>渲染失败：{renderJob.result?.error}</div>}
 
-          <div className="card">
+          {!whole && <div className="card">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><h2>{sc.id} {sc.name}</h2><span className={`pill ${cls}`}>{label}</span>
               {sc.costWarn && <span className="pill neg">本轮 {yuan(sc.rounds.at(-1)?.cost ?? 0)}</span>}</div>
             <div className="small muted" style={{ margin: "6px 0 10px" }}>画面：{sc.visual}</div>
@@ -201,7 +206,7 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
                 ))}
               </div>
             )}
-          </div>
+          </div>}
         </div>
       </div>
     </>
