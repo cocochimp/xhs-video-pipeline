@@ -102,3 +102,36 @@ def test_char_times_recovers_after_unmatched_word():
     assert st[4] == pytest.approx(0.2)
     assert en[-1] == pytest.approx(1.4)
     assert st == sorted(st)
+
+
+def test_snap_start_moves_start_to_pause_end():
+    from tools.audio_timeline import snap_start
+    assert snap_start(19.04, [[19.14, 19.69]]) == 19.69   # 停顿在开始后不久出现
+    assert snap_start(5.46, [[4.97, 5.55]]) == 5.55       # 开始落在停顿里
+    assert snap_start(2.48, [[2.02, 2.45]]) == 2.48       # 停顿已经结束，不动
+    assert snap_start(1.0, [[1.5, 2.0]]) == 1.0           # 停顿太远，不动
+
+
+def test_layout_snaps_line_start_to_silence_end():
+    ep = make_episode()
+    audio = fake_seg_audio(ep)
+    before = layout(ep, audio, VOICE)
+    audio["body"]["silences"] = [[0.35, 0.55]]
+    after = layout(ep, audio, VOICE)
+    b = {(l["scene"], l["i"]): l["start"] for l in before["lines"]}
+    a = {(l["scene"], l["i"]): l["start"] for l in after["lines"]}
+    moved = {k for k in a if a[k] != b[k]}
+    assert moved == {("s03", 1)}
+    assert a[("s03", 1)] == pytest.approx(b[("s03", 1)] - 0.4 + 0.55)
+
+
+def test_layout_snap_past_tts_end_extends_end():
+    ep = make_episode()
+    audio = fake_seg_audio(ep)
+    before = {(l["scene"], l["i"]): l for l in layout(ep, audio, VOICE)["lines"]}[("s03", 1)]
+    audio["body"]["silences"] = [[0.45, 0.65]]   # 停顿在 TTS 开始后 0.05s 出现，TTS 结束落在停顿里
+    after = {(l["scene"], l["i"]): l for l in layout(ep, audio, VOICE)["lines"]}[("s03", 1)]
+    base = before["start"] - 0.4
+    assert before["end"] == pytest.approx(base + 0.6)
+    assert after["start"] == pytest.approx(base + 0.65)
+    assert after["end"] >= after["start"]

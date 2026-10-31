@@ -8,6 +8,8 @@
 
 import argparse
 import json
+import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -24,7 +26,24 @@ def load_voice() -> dict:
     return json.loads((ROOT / "studio/config.json").read_text())["voice"]
 
 
-def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = None, sync_root: Path | None = ROOT):
+def detect_silences(mp3: Path) -> list[list[float]]:
+    """用 ffmpeg silencedetect 找出音频里的停顿 [[开始, 结束], ...]（秒）；末尾没结束的停顿丢弃。"""
+    import imageio_ffmpeg
+    r = subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-hide_banner", "-i", str(mp3),
+                        "-af", "silencedetect=noise=-40dB:d=0.12", "-f", "null", "-"],
+                       capture_output=True, text=True, check=True)
+    out, start = [], None
+    for m in re.finditer(r"silence_(start|end): (-?[\d.]+)", r.stderr):
+        if m.group(1) == "start":
+            start = float(m.group(2))
+        elif start is not None:
+            out.append([round(start, 3), round(float(m.group(2)), 3)])
+            start = None
+    return out
+
+
+def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = None, sync_root: Path | None = ROOT,
+          detect=detect_silences):
     """返回 (timeline, 本次计费字数)。"""
     if synth is None:
         import tts_doubao
@@ -51,8 +70,11 @@ def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = No
                 wfile.write_text(json.dumps(cached, ensure_ascii=False))
                 billed += len(text)
                 print(f"  配音 {seg}：{len(text)} 字")
+            if "silences" not in cached:
+                cached["silences"] = detect(mp3)
+                wfile.write_text(json.dumps(cached, ensure_ascii=False))
             words = [tuple(w) for w in cached["words"]]
-            seg_audio[seg] = {"duration": words[-1][1] + TAIL, "words": words, "hash": key}
+            seg_audio[seg] = {"duration": words[-1][1] + TAIL, "words": words, "hash": key, "silences": cached["silences"]}
         tl = layout(episode, seg_audio, voice)
         (audio / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1))
     finally:

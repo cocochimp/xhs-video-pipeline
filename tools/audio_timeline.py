@@ -8,6 +8,7 @@ FPS = 30
 TAIL = 0.25        # 每段最后一个字之后留的余量（秒）
 END_PAD = 1.2      # 全片最后留白（秒）
 ROLL_LEAD = 0.05   # 选题滚动在前一段配音结束后多久开始（秒）
+SNAP_AHEAD = 0.2   # 台词开始后这么短的时间内若出现停顿，说明 TTS 时间戳偏早，吸附到停顿结束
 
 
 def norm(s: str) -> str:
@@ -36,6 +37,14 @@ def char_times(speech: str, words) -> tuple[list[float], list[float]]:
             st[i] = en[i] = last
         last = en[i]
     return st, en
+
+
+def snap_start(t: float, silences: list[list[float]]) -> float:
+    """t 落在某段停顿里，或某段停顿在 t 之后 SNAP_AHEAD 秒内开始 → 返回该停顿的结束时间；否则原样返回。"""
+    for s, e in silences:
+        if s - SNAP_AHEAD <= t <= e:
+            return e
+    return t
 
 
 def segment_speech(episode: dict) -> dict[str, str]:
@@ -115,8 +124,10 @@ def layout(episode: dict, seg_audio: dict, voice: dict) -> dict:
             n, k = len(norm(ln["say"])), pos[seg]
             if n == 0:
                 raise ValueError(f"场景 {sc['id']} 第 {i} 句朗读文本为空")
+            start = base + snap_start(st[k], seg_audio[seg].get("silences", []))
+            end = max(base + en[k + n - 1], start)   # TTS 的结束时间可能和开始一样偏早
             lines.append({"scene": sc["id"], "i": i, "seg": seg, "zh": ln["zh"],
-                          "start": round(base + st[k], 3), "end": round(base + en[k + n - 1], 3)})
+                          "start": round(start, 3), "end": round(end, 3)})
             pos[seg] = k + n
 
     first: dict[str, float] = {}
