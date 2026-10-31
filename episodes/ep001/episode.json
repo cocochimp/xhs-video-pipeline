@@ -1,0 +1,410 @@
+{
+  "id": "ep001",
+  "no": 1,
+  "total": 100,
+  "stage": "review",
+  "topic": {
+    "candidates": [],
+    "chosen": null,
+    "rounds": []
+  },
+  "title": "月薪8千，想退休到底要攒多少钱？",
+  "roll": {
+    "after": "open",
+    "dur": 1.2,
+    "topics": [
+      "应急金存几个月才够？",
+      "看懂工资条：税前1万到手多少",
+      "外卖vs带饭：一个月差多少钱",
+      "花呗分期：利率到底多高",
+      "存款100万，每月能有多少被动收入",
+      "想裸辞又不敢？先存够这一笔钱"
+    ]
+  },
+  "segments": [
+    {
+      "id": "open",
+      "gap": 0.3
+    },
+    {
+      "id": "title",
+      "gap": 1.4
+    },
+    {
+      "id": "body",
+      "gap": 0.5
+    },
+    {
+      "id": "end",
+      "gap": 0.6
+    }
+  ],
+  "scenes": [
+    {
+      "id": "s01",
+      "name": "开头举牌",
+      "visual": "阿牛举牌，牌上写「第1期」",
+      "lines": [
+        {
+          "seg": "open",
+          "zh": "阿牛FIRE计划，第1期",
+          "say": "阿牛Fire计划，第一期。"
+        }
+      ],
+      "sfx": [
+        {
+          "line": 0,
+          "kind": "pop",
+          "vol": 0.8
+        }
+      ],
+      "textStatus": "approved",
+      "status": "pending",
+      "rounds": []
+    },
+    {
+      "id": "s02",
+      "name": "选题滚动",
+      "visual": "阿牛指向右侧，选题卡片像老虎机一样滚动，停在本期标题",
+      "lines": [
+        {
+          "seg": "open",
+          "zh": "这一期聊：",
+          "say": "这一期聊："
+        },
+        {
+          "seg": "title",
+          "zh": "月薪8千，想退休到底要攒多少钱？",
+          "say": "月薪八千，想退休，到底要攒多少钱？"
+        }
+      ],
+      "sfx": [],
+      "textStatus": "approved",
+      "status": "pending",
+      "rounds": []
+    },
+    {
+      "id": "s03",
+      "name": "工资卡",
+      "visual": "到手8000和每月花5000两张卡，阿牛从指向变成思考",
+      "lines": [
+        {
+          "seg": "body",
+          "zh": "到手【8000】，每月花【5000】",
+          "say": "到手八千，每月花五千。"
+        },
+        {
+          "seg": "body",
+          "zh": "想不上班也有钱花",
+          "say": "想不上班也有钱花，"
+        },
+        {
+          "seg": "body",
+          "zh": "到底要攒多少？",
+          "say": "到底要攒多少？"
+        }
+      ],
+      "sfx": [
+        {
+          "line": 0,
+          "kind": "whoosh",
+          "vol": 0.7,
+          "offset": -0.15
+        },
+        {
+          "line": 0,
+          "kind": "pop",
+          "vol": 0.7
+        },
+        {
+          "line": 2,
+          "kind": "pop",
+          "vol": 0.7
+        }
+      ],
+      "textStatus": "approved",
+      "status": "pending",
+      "rounds": []
+    },
+    {
+      "id": "s04",
+      "name": "4%法则",
+      "visual": "存钱罐每年漏出几枚金币，卡片写每年只花4%，打勾",
+      "lines": [
+        {
+          "seg": "body",
+          "zh": "有个简单的算法，叫【4%法则】",
+          "say": "有个简单的算法，叫百分之四法则："
+        },
+        {
+          "seg": "body",
+          "zh": "每年只花存款的【4%】",
+          "say": "每年只花存款的百分之四，"
+        },
+        {
+          "seg": "body",
+          "zh": "钱基本就花不完",
+          "say": "钱基本就花不完。"
+        }
+      ],
+      "sfx": [
+        {
+          "line": 0,
+          "kind": "pop",
+          "vol": 0.7
+        },
+        {
+          "line": 1,
+          "kind": "pop",
+          "vol": 0.7
+        },
+        {
+          "line": 2,
+          "kind": "pop",
+          "vol": 0.7
+        }
+      ],
+      "textStatus": "approved",
+      "status": "pending",
+      "rounds": []
+    },
+    {
+      "id": "s05",
+      "name": "年支出×25",
+      "visual": "公式卡：年支出 × 25 = 退休数字，阿牛按计算器",
+      "lines": [
+        {
+          "seg": "body",
+          "zh": "反过来算",
+          "say": "反过来算："
+        },
+        {
+          "seg": "body",
+          "zh": "一年花多少，【乘以25】",
+          "say": "一年花多少，乘以二十五，"
+        },
+        {
+          "seg": "body",
+          "zh": "就是你的【退休数字】",
+          "say": "就是你的退休数字。"
+        }
+      ],
+      "sfx": [
+        {
+          "line": 1,
+          "kind": "pop",
+          "vol": 0.7
+        },
+        {
+          "line": 2,
+          "kind": "pop",
+          "vol": 0.7
+        }
+      ],
+      "textStatus": "approved",
+      "status": "pending",
+      "rounds": []
+    },
+    {
+      "id": "s06",
+      "name": "150万",
+      "visual": "算式逐行出现，150万砸下来画面震动，阿牛受惊，旁边一个钱袋",
+      "lines": [
+        {
+          "seg": "body",
+          "zh": "每月5000，一年【6万】",
+          "say": "每月五千，一年六万，"
+        },
+        {
+          "seg": "body",
+          "zh": "再乘以25",
+          "say": "再乘以二十五，"
+        },
+        {
+          "seg": "body",
+          "zh": "【150万】",
+          "say": "一百五十万。"
+        }
+      ],
+      "sfx": [
+        {
+          "line": 0,
+          "kind": "pop",
+          "vol": 0.7
+        },
+        {
+          "line": 1,
+          "kind": "pop",
+          "vol": 0.7
+        },
+        {
+          "line": 2,
+          "kind": "stamp",
+          "vol": 1.0
+        }
+      ],
+      "textStatus": "approved",
+      "status": "pending",
+      "rounds": []
+    },
+    {
+      "id": "s07",
+      "name": "好消息",
+      "visual": "阿牛先摊手「很吓人？」，再指向「好消息」卡片：花得越少，要攒的越少",
+      "lines": [
+        {
+          "seg": "body",
+          "zh": "很吓人？",
+          "say": "很吓人？"
+        },
+        {
+          "seg": "body",
+          "zh": "别急，这个公式藏着一个【好消息】",
+          "say": "别急，这个公式藏着一个好消息："
+        },
+        {
+          "seg": "body",
+          "zh": "花得越少，要攒的就【越少】",
+          "say": "花得越少，要攒的就越少。"
+        }
+      ],
+      "sfx": [
+        {
+          "line": 1,
+          "kind": "pop",
+          "vol": 0.7
+        },
+        {
+          "line": 2,
+          "kind": "pop",
+          "vol": 0.7
+        }
+      ],
+      "textStatus": "approved",
+      "status": "pending",
+      "rounds": []
+    },
+    {
+      "id": "s08",
+      "name": "少花1000",
+      "visual": "150万被划掉改成120万，外卖和奶茶飞走，打勾，阿牛欢呼",
+      "lines": [
+        {
+          "seg": "body",
+          "zh": "每月少花【1000】",
+          "say": "每月少花一千，"
+        },
+        {
+          "seg": "body",
+          "zh": "目标直接少【30万】",
+          "say": "目标直接少三十万。"
+        }
+      ],
+      "sfx": [
+        {
+          "line": 0,
+          "kind": "pop",
+          "vol": 0.7
+        },
+        {
+          "line": 1,
+          "kind": "pop",
+          "vol": 0.9
+        }
+      ],
+      "textStatus": "approved",
+      "status": "pending",
+      "rounds": []
+    },
+    {
+      "id": "s09",
+      "name": "先算清楚",
+      "visual": "「第一步不是赚更多」被划掉，「先算清楚」橙色卡，日历和计算器",
+      "lines": [
+        {
+          "seg": "body",
+          "zh": "所以第一步不是赚更多",
+          "say": "所以第一步不是赚更多，"
+        },
+        {
+          "seg": "body",
+          "zh": "而是先【算清楚】",
+          "say": "而是先算清楚："
+        },
+        {
+          "seg": "body",
+          "zh": "你一个月到底花多少钱",
+          "say": "你一个月到底花多少钱。"
+        }
+      ],
+      "sfx": [
+        {
+          "line": 0,
+          "kind": "whoosh",
+          "vol": 0.6,
+          "offset": -0.1
+        }
+      ],
+      "textStatus": "approved",
+      "status": "pending",
+      "rounds": []
+    },
+    {
+      "id": "s10",
+      "name": "结尾",
+      "visual": "阿牛举牌「你的数字是？」，再挥手：关注阿牛，一起早日退休！加头像和免责小字",
+      "lines": [
+        {
+          "seg": "end",
+          "zh": "你每月花多少？",
+          "say": "你每月花多少？"
+        },
+        {
+          "seg": "end",
+          "zh": "评论区算算你的【退休数字】",
+          "say": "评论区算算你的退休数字。"
+        },
+        {
+          "seg": "end",
+          "zh": "关注阿牛",
+          "say": "关注阿牛，"
+        },
+        {
+          "seg": "end",
+          "zh": "一起【早日退休】！",
+          "say": "一起早日退休！"
+        }
+      ],
+      "sfx": [
+        {
+          "line": 0,
+          "kind": "whoosh",
+          "vol": 0.7,
+          "offset": -0.15
+        },
+        {
+          "line": 1,
+          "kind": "pop",
+          "vol": 0.6
+        },
+        {
+          "line": 2,
+          "kind": "pop",
+          "vol": 0.8
+        },
+        {
+          "line": 3,
+          "kind": "stamp",
+          "vol": 0.6
+        }
+      ],
+      "textStatus": "approved",
+      "status": "pending",
+      "rounds": []
+    }
+  ],
+  "cost": {
+    "tts": 0.0762,
+    "image": 0
+  }
+}
