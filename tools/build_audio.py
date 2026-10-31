@@ -1,0 +1,73 @@
+"""按 episode.json 生成整期配音和时间轴。台词和音色都没变的段直接用缓存，不调用 TTS。
+
+  .venv/bin/python tools/build_audio.py episodes/ep001
+  .venv/bin/python tools/build_audio.py episodes/ep001 --force   # 全部重配
+
+产物（episodes/<id>/audio/）：vo_<段>.mp3、words_<段>.json（逐字时间 + 缓存键）、timeline.json
+"""
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from tools.audio_timeline import TAIL, layout, segment_hash, segment_speech  # noqa: E402
+from tools.sync_public import sync  # noqa: E402
+
+PRICE = 0.0003  # 豆包语音合成 2.0，元/字（标点也算字）
+
+
+def load_voice() -> dict:
+    return json.loads((ROOT / "studio/config.json").read_text())["voice"]
+
+
+def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = None, sync_root: Path | None = ROOT):
+    """返回 (timeline, 本次计费字数)。"""
+    if synth is None:
+        import tts_doubao
+        synth = tts_doubao.synth
+    voice = voice or load_voice()
+    episode = json.loads((ep_dir / "episode.json").read_text())
+    audio = ep_dir / "audio"
+    audio.mkdir(exist_ok=True)
+    seg_audio, billed = {}, 0
+    for seg, text in segment_speech(episode).items():
+        key = segment_hash(voice["speaker"], voice["rate"], text)
+        wfile, mp3 = audio / f"words_{seg}.json", audio / f"vo_{seg}.mp3"
+        cached = json.loads(wfile.read_text()) if wfile.exists() and mp3.exists() else None
+        if force or not cached or cached["hash"] != key:
+            words = synth(text, mp3, speaker=voice["speaker"], speech_rate=voice["rate"])
+            if not words:
+                raise RuntimeError(f"配音段 {seg} 没有返回逐字时间")
+            cached = {"hash": key, "words": [list(w) for w in words]}
+            wfile.write_text(json.dumps(cached, ensure_ascii=False))
+            billed += len(text)
+            print(f"  配音 {seg}：{len(text)} 字")
+        words = [tuple(w) for w in cached["words"]]
+        seg_audio[seg] = {"duration": words[-1][1] + TAIL, "words": words, "hash": key}
+    tl = layout(episode, seg_audio, voice)
+    (audio / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1))
+    if billed:
+        episode["cost"]["tts"] = round(episode["cost"]["tts"] + billed * PRICE, 4)
+        (ep_dir / "episode.json").write_text(json.dumps(episode, ensure_ascii=False, indent=2) + "\n")
+    if sync_root:
+        sync(sync_root)
+    return tl, billed
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("episode", type=Path)
+    ap.add_argument("--force", action="store_true")
+    a = ap.parse_args()
+    import pipeline
+    pipeline.load_env()
+    tl, billed = build(a.episode.resolve(), force=a.force)
+    print(f"时长 {tl['duration']:.1f}s，{len(tl['scenes'])} 个场景，本次配音 {billed} 字（约 {billed * PRICE:.2f} 元）")
+
+
+if __name__ == "__main__":
+    main()
