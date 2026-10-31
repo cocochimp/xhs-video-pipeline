@@ -167,6 +167,7 @@ export const AudioPage: React.FC<{ tab?: string }> = ({ tab = "voice" }) => {
           </tbody>
         </table>
       )}
+      {(tab === "bgm" || tab === "sfx") && <FreeSources tab={tab} />}
       {tab === "sfx" && (
         <table>
           <thead><tr><th>音效</th><th>代号</th><th className="num">用在几处</th><th /></tr></thead>
@@ -184,6 +185,30 @@ export const AudioPage: React.FC<{ tab?: string }> = ({ tab = "voice" }) => {
     </>
   );
 };
+
+const SOURCES = {
+  bgm: [
+    ["Pixabay 音乐", "https://pixabay.com/music/", "可商用，不用署名；可按「欢快 / 轻松」筛选"],
+    ["Mixkit 音乐", "https://mixkit.co/free-stock-music/", "可商用，不用署名；曲目少但质量稳定"],
+    ["Uppbeat", "https://uppbeat.io/", "免费账号每月可下 3 首，发视频时按提示署名"],
+    ["YouTube 音频库", "https://www.youtube.com/audiolibrary", "要登录 YouTube；标着「无需署名」的可直接用"],
+  ],
+  sfx: [
+    ["Pixabay 音效", "https://pixabay.com/sound-effects/", "可商用，不用署名；搜 pop、whoosh、ding、click"],
+    ["Mixkit 音效", "https://mixkit.co/free-sound-effects/", "可商用，不用署名；按类别分好了"],
+    ["Freesound", "https://freesound.org/search/?f=license:%22Creative+Commons+0%22", "链接已筛选 CC0（无需署名），要注册才能下载"],
+  ],
+} as const;
+
+const FreeSources: React.FC<{ tab: "bgm" | "sfx" }> = ({ tab }) => (
+  <section style={{ marginTop: 32 }}>
+    <h2 style={{ marginBottom: 8 }}>免费素材去哪找</h2>
+    <p className="small muted" style={{ margin: "0 0 8px" }}>下载前看一眼单个文件的授权，下载后点右上角「上传」加进来。</p>
+    <table><tbody>{SOURCES[tab].map(([n, u, d]) => (
+      <tr key={u}><td><a className="link" href={u} target="_blank" rel="noreferrer">{n}</a></td><td className="muted small">{d}</td></tr>
+    ))}</tbody></table>
+  </section>
+);
 
 export const ComponentsPage: React.FC = () => {
   const { ask } = useApp();

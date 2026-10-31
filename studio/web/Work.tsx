@@ -218,7 +218,7 @@ const Preview: React.FC<{ mod: EpisodeModule; start: number; end: number }> = ({
   return (
     <div className="player" data-ui>
       <Player component={C} durationInFrames={f(mod.timeline.duration)} fps={FPS} compositionWidth={1440} compositionHeight={1080}
-        style={{ width: "100%" }} controls loop initialFrame={Math.round((f(start) + f(end)) / 2)} inFrame={f(start)} outFrame={Math.max(f(start) + 1, f(end) - 1)} key={`${start}-${end}`} />
+        style={{ width: "100%" }} controls autoPlay inFrame={f(start)} outFrame={Math.max(f(start) + 1, f(end) - 1)} key={`${start}-${end}`} />
     </div>
   );
 };

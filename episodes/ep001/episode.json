@@ -29,13 +29,11 @@
   "segments": [
     {
       "id": "open",
-      "gap": 0.3,
-      "rate": 38
+      "gap": 0.3
     },
     {
       "id": "title",
-      "gap": 2.35,
-      "rate": 38
+      "gap": 2.35
     },
     {
       "id": "body",
@@ -435,7 +433,7 @@
     }
   ],
   "cost": {
-    "tts": 0.1029,
+    "tts": 0.1842,
     "image": 0
   }
 }
