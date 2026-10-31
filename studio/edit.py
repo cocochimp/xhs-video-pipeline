@@ -60,18 +60,9 @@ def build_prompt(ep_dir: Path, sid: str, issue: str, error: str = "") -> str:
 
 def claude_runner(prompt: str) -> dict:
     """调用本机 Claude Code，返回最后一行 JSON：{"summary", "ask"}。"""
-    r = subprocess.run(
-        ["claude", "-p", prompt, "--output-format", "json", "--permission-mode", "acceptEdits",
-         "--allowedTools", "Read", "Edit", "Write", "Bash(.venv/bin/python tools/gen_asset.py:*)"],
-        cwd=ROOT, capture_output=True, text=True, timeout=TIMEOUT)
-    if r.returncode != 0:
-        raise RuntimeError(f"Claude Code 失败：{r.stderr.strip()[-300:]}")
-    text = json.loads(r.stdout).get("result", "")
-    for line in reversed(text.strip().splitlines()):
-        line = line.strip().strip("`")
-        if line.startswith("{"):
-            return json.loads(line)
-    return {"summary": text.strip()[-120:], "ask": None}
+    from studio.ai import claude, last_json
+    text, _ = claude(prompt, "edit")
+    return last_json(text) or {"summary": text.strip()[-120:], "ask": None}
 
 
 def check_code(ep_dir: Path, sid: str) -> str:

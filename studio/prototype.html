@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<title>阿牛工作台 · 交互原型</title>
+<style>
+:root{--ink:#1d2a35;--muted:#5f6d78;--line:#d7e0e5;--paper:#fff;--wash:#f4f7f8;--navy:#17324d;--teal:#087f8c;--orange:#c7682e;--green:#2d7c61;--red:#b54034;--shadow:0 14px 38px rgba(23,50,77,.10);--r:10px}
+*{box-sizing:border-box}
+body{margin:0;color:var(--ink);background:var(--wash);font:14px/1.75 Inter,-apple-system,"PingFang SC",sans-serif;-webkit-font-smoothing:antialiased}
+button,input,textarea,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:#fff;border-radius:7px;padding:7px 13px}
+button:hover{background:#e7f1f2;border-color:#b9d5d8}
+.primary{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600;box-shadow:0 3px 8px rgba(23,50,77,.16)}
+.primary:hover{background:#1f4268;border-color:#1f4268}
+.ok{background:var(--green);border-color:var(--green);color:#fff}.ok:hover{background:#246a52}
+.tb{background:none;border:0;color:var(--teal);padding:2px 0;font-size:12px}.tb:hover{background:none;text-decoration:underline}
+a{color:var(--teal);text-decoration:none}
+h1{font-size:22px;color:var(--navy);margin:2px 0 4px;letter-spacing:-.4px}
+h2{font-size:15px;color:var(--navy);margin:0}
+.eyebrow{font-size:11px;letter-spacing:1.4px;color:var(--teal);font-weight:600;text-transform:uppercase}
+.muted{color:var(--muted)}.small{font-size:12px}
+.layout{display:grid;grid-template-columns:214px 1fr;min-height:100vh}
+aside{background:#fff;border-right:1px solid var(--line);padding:18px 12px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column}
+.brand{display:flex;gap:10px;align-items:center;padding:0 6px 16px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.logo{width:34px;height:34px;border-radius:8px;background:var(--orange);color:#fff;display:grid;place-items:center;font-weight:700}
+.navg{font-size:11px;color:var(--muted);letter-spacing:1px;margin:14px 8px 4px}
+.nav{display:block;padding:7px 10px;border-radius:7px;color:var(--ink);font-size:13.5px}
+.nav:hover{background:var(--wash);text-decoration:none}
+.nav.on{background:#e7f1f2;color:var(--teal);font-weight:600}
+.nav .cnt{float:right;font-size:11px;color:var(--muted)}
+main{padding:22px 28px 60px;min-width:0}
+.top{display:flex;align-items:flex-end;gap:14px;margin-bottom:18px}
+.top .sp{flex:1}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.grid{display:grid;gap:14px}
+.g3{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.g4{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.tag{display:inline-block;font-size:11px;padding:1px 8px;border-radius:20px;background:var(--wash);border:1px solid var(--line);color:var(--muted)}
+.tag.t{background:#e7f1f2;border-color:#b9d5d8;color:var(--teal)}
+.tag.o{background:#fbefe6;border-color:#efc7aa;color:var(--orange)}
+.tag.g{background:#e5f2ec;border-color:#b5d8c8;color:var(--green)}
+.tag.r{background:#f8e7e5;border-color:#e6b9b3;color:var(--red)}
+.steps{display:flex;gap:6px;margin:10px 0}
+.steps span{flex:1;height:4px;border-radius:2px;background:var(--line)}
+.steps span.d{background:var(--teal)}.steps span.c{background:var(--orange)}
+.stepbar{display:flex;gap:0;margin:4px 0 18px;background:#fff;border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.stepbar div{flex:1;padding:10px 14px;font-size:13px;color:var(--muted);border-right:1px solid var(--line);cursor:pointer}
+.stepbar div:last-child{border:0}
+.stepbar div.on{background:var(--navy);color:#fff;font-weight:600}
+.stepbar div.d{color:var(--teal)}
+.stepbar b{display:block;font-size:11px;letter-spacing:1px;opacity:.7;font-weight:500}
+.thumb{aspect-ratio:4/3;border-radius:7px;background:repeating-linear-gradient(45deg,#f1ece2,#f1ece2 8px,#f7f3ea 8px,#f7f3ea 16px);display:grid;place-items:center;color:#a99c86;font-size:12px}
+textarea,input[type=text],select{width:100%;border:1px solid var(--line);border-radius:7px;padding:8px 10px;background:#fff}
+textarea:focus,input:focus{outline:2px solid #b9d5d8;border-color:#6db8be}
+.row{display:flex;gap:10px;align-items:center}
+.sp{flex:1}
+.split{display:grid;grid-template-columns:340px 1fr;gap:16px;align-items:start}
+.scene{display:flex;gap:10px;padding:8px;border-radius:8px;border:1px solid var(--line);background:#fff;margin-bottom:8px;cursor:pointer}
+.scene.on{border-color:var(--orange);box-shadow:0 0 0 2px #f3d5bf}
+.scene.ap{opacity:.55}
+.scene .thumb{width:88px;flex-shrink:0}
+.player{aspect-ratio:4/3;max-height:420px;background:#f7f3ea;border-radius:var(--r);border:1px solid var(--line);display:grid;place-items:center;color:#a99c86}
+.list li{margin:2px 0}
+.chat{position:fixed;right:0;top:0;bottom:0;width:360px;background:#fff;border-left:1px solid var(--line);box-shadow:var(--shadow);display:flex;flex-direction:column;transform:translateX(100%);transition:transform .2s;z-index:10}
+.chat.open{transform:none}
+.chat .msgs{flex:1;overflow:auto;padding:14px}
+.msg{margin:0 0 10px;padding:8px 11px;border-radius:9px;max-width:88%;font-size:13px}
+.msg.me{background:var(--navy);color:#fff;margin-left:auto}
+.msg.ai{background:var(--wash)}
+.msg .act{display:block;margin-top:6px}
+.fab{position:fixed;right:22px;bottom:22px;z-index:9;border-radius:24px;padding:10px 18px}
+.ctx{font-size:11px;padding:6px 14px;background:#e7f1f2;color:var(--teal)}
+.toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;z-index:20;display:none}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--muted);font-weight:500;font-size:12px}
+.note{border-left:3px solid var(--orange);background:#fbefe6;padding:8px 12px;border-radius:0 7px 7px 0;font-size:13px}
+.proto{position:fixed;left:226px;bottom:10px;font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <div class="brand"><div class="logo">牛</div><div><b style="color:var(--navy)">阿牛工作台</b><div class="small muted">阿牛FIRE计划</div></div></div>
+    <div class="navg">审片台</div>
+    <a class="nav" href="#new">＋ 新建作品</a>
+    <a class="nav" href="#todo">进行中 <span class="cnt" id="cTodo"></span></a>
+    <a class="nav" href="#done">作品库 <span class="cnt" id="cDone"></span></a>
+    <div class="navg">素材库</div>
+    <a class="nav" href="#audio">音效库</a>
+    <a class="nav" href="#comp">组件库</a>
+    <a class="nav" href="#topics">选题库</a>
+    <div class="sp"></div>
+    <div class="small" style="padding:10px 8px;border-top:1px solid var(--line)"><b style="color:var(--navy)">本月花费 ¥8.97</b>
+      <div class="muted">画面 ¥2.88 · 配音 ¥0.54<br>AI ¥5.55 （packyapi 余额 $12.40）</div></div>
+  </aside>
+  <main id="main"></main>
+</div>
+<button class="primary fab" onclick="toggleChat()">💬 问 AI</button>
+<div class="chat" id="chat">
+  <div class="row" style="padding:12px 14px;border-bottom:1px solid var(--line)"><h2>AI 助手</h2><div class="sp"></div><button class="tb" onclick="toggleChat()">收起 ✕</button></div>
+  <div class="ctx" id="ctx"></div>
+  <div class="msgs" id="msgs"></div>
+  <div style="padding:12px;border-top:1px solid var(--line)">
+    <textarea id="ask" rows="3" placeholder="比如：把片尾音效换成更轻的叮一声"></textarea>
+    <div class="row" style="margin-top:8px"><span class="small muted">AI 改动前会先给你确认</span><div class="sp"></div><button class="primary" onclick="send()">发送</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="proto">交互原型 · 数据为假数据，按钮不会真的调用 AI 或扣费</div>
+
+<script>
+const S = {
+  works: [
+    {id:'ep001',no:1,title:'月薪8千，多久能退休？',stage:4,scenes:10,ok:6,cost:1.86,upd:'今天 14:20'},
+    {id:'ep002',no:2,title:'每月存2000，复利有多猛？',stage:2,cost:0.02,upd:'昨天'},
+    {id:'ep003',no:3,title:'公积金到底能不能取？',stage:1,cost:0,upd:'10-29'},
+  ],
+  done: [{id:'ep000',no:0,title:'试播：阿牛是谁',dur:'48s',cost:2.10,at:'10-25'}],
+  chat: [{ai:1,t:'你好，我可以帮你改素材、选题和片子。现在在哪个页面，我就默认在聊哪一块。'}],
+  sel:'s03', step:1,
+};
+const STAGES=['选题','文本','生成','审片'];
+const SC=[['s01','开场',1],['s02','选题滚动',1],['s03','提出问题',0],['s04','算账',1],['s05','收入增长',1],['s06','150万砸下来',0],['s07','复利',1],['s08','结论',1],['s09','提醒',0],['s10','片尾',0]];
+const $=s=>document.querySelector(s);
+const toast=t=>{const e=$('#toast');e.textContent=t;e.style.display='block';clearTimeout(e._t);e._t=setTimeout(()=>e.style.display='none',1800)};
+const stageTag=s=>`<span class="tag ${s===4?'o':'t'}">${s}/4 · ${STAGES[s-1]}</span>`;
+const steps=s=>`<div class="steps">${[1,2,3,4].map(i=>`<span class="${i<s?'d':i===s?'c':''}"></span>`).join('')}</div>`;
+const head=(eb,t,sub,right='')=>`<div class="top"><div><div class="eyebrow">${eb}</div><h1>${t}</h1>${sub?`<div class="muted">${sub}</div>`:''}</div><div class="sp"></div>${right}</div>`;
+
+const P = {
+todo(){return head('STUDIO · TODO','进行中','','<a href="#new"><button class="primary">＋ 新建作品</button></a>')+
+ `<div class="grid g3">${S.works.map(w=>`<div class="card"><div class="row"><b style="color:var(--navy)">第 ${w.no} 期</b><div class="sp"></div>${stageTag(w.stage)}</div>
+ <div style="margin:6px 0;font-weight:600">${w.title}</div>${steps(w.stage)}
+ <div class="small muted">花费 ¥${w.cost.toFixed(2)} · ${w.upd}</div>
+ <div class="row" style="margin-top:10px"><a href="#work/${w.id}"><button class="primary">继续${STAGES[w.stage-1]}</button></a><div class="sp"></div><button class="tb" onclick="toast('原型：会先二次确认再删除')">删除</button></div></div>`).join('')}</div>`},
+
+new(){return head('STUDIO · NEW','新建作品','')+
+ `<div class="split"><div class="card"><h2>从选题库挑</h2>
+ ${['每月存2000，复利有多猛？','公积金到底能不能取？','35岁失业，存款够撑几年？','年终奖怎么花最不亏？','房贷提前还还是理财？'].map((t,i)=>`<label class="row" style="padding:7px 0;border-bottom:1px solid var(--line)"><input type="radio" name="tp" ${i?'':'checked'}> ${t}</label>`).join('')}
+ <div class="row" style="margin-top:12px"><button onclick="toast('原型：AI 会再生成 5 个候选')">🎲 让 AI 再出几个</button></div></div>
+ <div class="card"><h2>或者自己写</h2><input type="text" placeholder="一句话说清这期聊什么" style="margin:10px 0">
+ <div class="row" style="margin-top:14px"><div class="sp"></div><button class="primary" onclick="newWork()">确定选题，写文本 →</button></div></div></div>`},
+
+work(id){const w=S.works.find(x=>x.id===id)||S.works[0];const st=S.step=S.stepOf?.[id]??w.stage;
+ return head(`第 ${w.no} 期`,w.title,'',`<span class="small muted">花费 ¥${w.cost.toFixed(2)}</span>`)+
+ `<div class="stepbar">${STAGES.map((n,i)=>`<div class="${i+1===st?'on':i+1<w.stage?'d':''}" onclick="goStep('${w.id}',${i+1})"><b>STEP ${i+1}</b>${i+1<w.stage?'✓ ':''}${n}</div>`).join('')}</div>`+
+ [null,stepTopic,stepText,stepGen,stepReview][st](w)},
+
+done(){return head('STUDIO · LIBRARY','作品库','')+
+ `<div class="grid g4">${S.done.map(d=>`<div class="card"><div class="thumb">成片封面</div><b style="display:block;margin-top:8px">第 ${d.no} 期 · ${d.title}</b>
+ <div class="small muted">${d.dur} · ¥${d.cost.toFixed(2)} · ${d.at} 完结</div>
+ <div class="row" style="margin-top:8px"><button onclick="toast('原型：播放成片')">▶ 播放</button><button onclick="toast('原型：打开 mp4 所在文件夹')">下载</button><div class="sp"></div><button class="tb" onclick="reopen('${d.id}')">重新审片</button></div></div>`).join('')}</div>`},
+
+audio(tab){tab=tab||'voice';const T={voice:'配音',bgm:'背景音乐',sfx:'音效'};
+ const D={voice:[['温暖阿虎 2.0',1],['爽快思思'],['阳光青年'],['知性灿灿']],bgm:[['轻快木琴',1],['温柔钢琴'],['俏皮尤克里里']],sfx:[['老虎机滚动','片头'],['滑动 whoosh','选题滚动'],['叮','打勾、结论'],['砸地 thud','数字砸下']]};
+ const tabs=`<div class="stepbar" style="max-width:420px">${Object.entries(T).map(([k,n])=>`<div class="${k===tab?'on':''}" onclick="location.hash='audio/${k}'">${n}</div>`).join('')}</div>`;
+ const rows=D[tab].map(r=>`<tr><td>${r[0]} ${r[1]===1?'<span class="tag g">当前使用</span>':''}${tab==='voice'&&r[1]===1?'<div class="small muted">语速 <input type="range" min="-50" max="50" value="15" style="width:120px;vertical-align:middle"> +15</div>':''}</td>
+ ${tab==='sfx'?`<td class="muted small">${r[1]}</td>`:''}<td style="text-align:right"><button class="tb" onclick="toast('原型：试听')">▶ 试听</button>　${tab==='sfx'?`<button class="tb" onclick="askAI('把「${r[0]}」换一个')">让 AI 换</button>`:r[1]===1?'':`<button class="tb" onclick="toast('原型：切换前提示影响哪些作品')">设为当前</button>`}</td></tr>`).join('');
+ return head('LIBRARY · AUDIO','音效库','',`<button onclick="${tab==='voice'?"toast('原型：从豆包音色列表添加')":"toast('原型：上传 mp3/wav')"}">${tab==='voice'?'添加音色':'上传'}</button>`)+tabs+`<div class="card"><table>${rows}</table></div>`},
+
+comp(){return head('LIBRARY · COMPONENTS','组件库','')+
+ `<h2 style="margin:4px 0 10px">阿牛姿势</h2><div class="grid g4">${['站立','惊讶','开心','思考','指向','躺平'].map(n=>`<div class="card"><div class="thumb">阿牛 · ${n}</div><div class="row small" style="margin-top:6px"><b>${n}</b><div class="sp"></div><button class="tb" onclick="askAI('重画阿牛「${n}」姿势')">重画</button></div></div>`).join('')}
+ <div class="card" style="display:grid;place-items:center;color:var(--teal);cursor:pointer" onclick="askAI('新增一个阿牛姿势：')">＋ 让 AI 画一个新的</div></div>
+ <h2 style="margin:22px 0 10px">动画组件</h2><div class="card"><table><tr><th>组件</th><th>效果</th></tr>
+ ${[['BigText','大数字砸下来'],['Card','卡片滑入'],['Check / Strike','打勾 / 划掉'],['Sticker','贴纸弹出'],['TopBar','顶部进度条 第x/100期']].map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`},
+
+topics(){return head('LIBRARY · TOPICS','选题库','','<button onclick="askAI(\'再帮我想 5 个选题\')">让 AI 出选题</button>')+
+ `<div class="card"><table><tr><th>选题</th><th>状态</th></tr>
+ ${[['月薪8千，多久能退休？','<span class="tag o">审片中</span>'],['每月存2000，复利有多猛？','<span class="tag t">写文本</span>'],['公积金到底能不能取？','<span class="tag t">选题</span>'],['35岁失业，存款够撑几年？','<span class="tag">未开始</span>'],['年终奖怎么花最不亏？','<span class="tag">未开始</span>']].map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`},
+};
+
+function stepTopic(w){return `<div class="card"><h2>选题</h2><p>${w.title}</p><div class="row" style="margin-top:10px"><button onclick="askAI('这个选题换个更抓人的说法')">让 AI 改说法</button><div class="sp"></div><button class="primary" onclick="adv('${w.id}')">选题确定 →</button></div></div>`}
+function stepText(w){const segs=[['开场','阿牛FIRE计划第2期，这一期聊：'],['正文','每个月存2000块，看起来不多……'],['正文','20年后，按年化5%算，大概是120万。'],['片尾','关注阿牛，一起早日退休！']];
+ return `<div class="split"><div class="card"><h2>整期文本</h2><div class="small muted" style="margin-bottom:8px">8 个分镜 · 约 260 字</div>
+ ${segs.map((s,i)=>`<div style="padding:8px 0;border-bottom:1px solid var(--line)"><span class="tag">${String(i+1).padStart(2,'0')} · ${s[0]}</span><div>${s[1]}</div><div class="small muted">画面：阿牛${['举牌','掰手指','看着数字瞪大眼','挥手'][i]}</div></div>`).join('')}
+ <div class="small muted" style="margin-top:6px">…其余 4 个分镜</div></div>
+ <div class="card"><h2>你觉得哪里要改？</h2><textarea rows="5" style="margin:10px 0" placeholder="比如：第3段的数字太突然，前面先铺垫一下"></textarea>
+ <div class="row"><button onclick="toast('原型：AI 改写文本（几乎不花钱）')">交给 AI 改</button><div class="sp"></div><button class="ok" onclick="adv('${w.id}')">文本通过，开始生成 →</button></div>
+ <div class="small muted" style="margin-top:10px">通过后预计花费约 ¥1.04</div></div></div>`}
+function stepGen(w){return `<div class="card"><h2>生成中</h2><div class="small muted">AI 正在画画面、配音、排时间线。可以先去做别的。</div>
+ <table style="margin-top:10px">${[['写分镜代码','✓ 完成'],['画面 8 张','5 / 8'],['配音 4 段','排队'],['生成缩略图','排队']].map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>
+ <div class="row" style="margin-top:12px"><span class="small muted">已花 ¥0.60</span><div class="sp"></div><button onclick="toast('原型：停止后已花的钱不退')">停止</button><button class="primary" onclick="adv('${w.id}')">（原型）模拟完成 →</button></div></div>`}
+function stepReview(w){const sc=SC.find(s=>s[0]===S.sel)||SC[0];const ok=SC.filter(s=>s[2]).length;
+ return `<div class="row" style="margin-bottom:12px"><span class="small muted">已通过 ${ok}/${SC.length} 片</span><div class="sp"></div><button onclick="toast('原型：渲染草稿 mp4')">渲染草稿</button><button class="primary" ${ok<SC.length?'disabled style="opacity:.5"':''} onclick="finish('${w.id}')">全部通过 · 渲染成片并完结</button></div>
+ <div class="split"><div>${SC.map(s=>`<div class="scene ${s[0]===sc[0]?'on':''} ${s[2]?'ap':''}" onclick="S.sel='${s[0]}';render()"><div class="thumb">${s[0]}</div><div class="small"><b>${s[0]} ${s[1]}</b><br>${s[2]?'<span class="tag g">已通过</span>':s[0]==='s06'?'<span class="tag r">出错</span>':'<span class="tag">待审</span>'}${s[0]==='s03'?' <span class="tag o">配音已更新</span>':''}</div></div>`).join('')}</div>
+ <div><div class="player">▶ ${sc[0]} 预览（前后各多放 0.5 秒）</div><label class="small"><input type="checkbox"> 整期播放</label>
+ <div class="card" style="margin-top:10px"><div class="row"><h2>${sc[0]} ${sc[1]}</h2><div class="sp"></div>${sc[2]?'<span class="tag g">已通过</span>':''}</div>
+ <div class="small muted" style="margin:4px 0">画面：阿牛举着计算器，数字一个个跳出来</div><div>· 月薪8千，每月能存多少？</div>
+ ${sc[0]==='s06'?'<div class="note" style="margin-top:8px;border-color:var(--red);background:#f8e7e5">上一轮出错：AI 改到了 s05，已自动还原。</div>':''}
+ <textarea rows="3" style="margin-top:10px" placeholder="这一片哪里不满意？比如：150万砸下来再慢一点"></textarea>
+ <div class="row" style="margin-top:8px"><button class="primary" onclick="toast('原型：排队交给 AI 修改')">交给 AI 修改</button><button class="ok" onclick="approve('${sc[0]}')">通过</button></div>
+ <h2 style="margin-top:14px">修改记录</h2><div class="small">第 1 轮：你「语气再轻松点」→ 改了第二句台词并重配 · ¥0.01 <button class="tb" onclick="toast('原型：撤销到这一轮之前')">撤销到此前</button></div></div></div></div>`}
+
+window.goStep=(id,n)=>{const w=S.works.find(x=>x.id===id);if(n>w.stage)return toast('前面的步骤还没完成');(S.stepOf??={})[id]=n;render()};
+window.adv=id=>{const w=S.works.find(x=>x.id===id);w.stage=Math.min(4,w.stage+1);(S.stepOf??={})[id]=w.stage;toast('进入：'+STAGES[w.stage-1]);render()};
+window.approve=sid=>{SC.find(s=>s[0]===sid)[2]=1;const n=SC.find(s=>!s[2]);if(n)S.sel=n[0];render()};
+window.newWork=()=>{const no=S.works.length+S.done.length+1;S.works.unshift({id:'ep00'+(no),no,title:'新选题',stage:2,cost:0,upd:'刚刚'});location.hash='work/ep00'+no};
+window.finish=id=>{const i=S.works.findIndex(x=>x.id===id);const w=S.works.splice(i,1)[0];S.done.unshift({id,no:w.no,title:w.title,dur:'1:12',cost:w.cost,at:'今天'});toast('已渲染并移入「作品库」');location.hash='done'};
+window.reopen=id=>{const i=S.done.findIndex(x=>x.id===id);const d=S.done.splice(i,1)[0];S.works.unshift({id,no:d.no,title:d.title,stage:4,scenes:10,ok:0,cost:d.cost,upd:'刚刚'});toast('已拉回审片台');location.hash='work/'+id};
+window.toggleChat=()=>$('#chat').classList.toggle('open');
+window.askAI=t=>{$('#chat').classList.add('open');$('#ask').value=t;$('#ask').focus()};
+window.send=()=>{const t=$('#ask').value.trim();if(!t)return;S.chat.push({t},{ai:1,t:`我理解你要：「${t}」。会改动 1 个素材，预计花费 ¥0.12。`,act:1});$('#ask').value='';drawChat()};
+function drawChat(){$('#msgs').innerHTML=S.chat.map(m=>`<div class="msg ${m.ai?'ai':'me'}">${m.t}${m.act?'<span class="act"><button class="primary" style="padding:4px 10px;font-size:12px" onclick="toast(\'原型：执行改动\')">确认执行</button> <button style="padding:4px 10px;font-size:12px">先不改</button></span>':''}</div>`).join('');$('#msgs').scrollTop=1e9}
+const CTX={todo:'进行中',new:'新建作品',work:'当前作品',done:'作品库',audio:'音效库',comp:'组件库',topics:'选题库'};
+function render(){const [p,arg]=(location.hash.slice(1)||'todo').split('/');$('#main').innerHTML=(P[p]||P.todo)(arg);
+ document.querySelectorAll('.nav').forEach(a=>a.classList.toggle('on',a.getAttribute('href')==='#'+(p==='work'?'todo':p)));
+ $('#cTodo').textContent=S.works.length;$('#cDone').textContent=S.done.length;
+ $('#ctx').textContent='正在聊：'+(CTX[p]||'')+(arg?' · '+arg:'');}
+addEventListener('hashchange',render);render();drawChat();
+</script>
+</body>
+</html>

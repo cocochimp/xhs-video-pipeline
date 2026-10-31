@@ -101,7 +101,12 @@ SFX = {"pop": sfx_pop, "stamp": sfx_stamp, "whoosh": sfx_whoosh}
 
 def build_tracks(duration: float, tl: dict, tmp: Path) -> tuple[Path, Path]:
     tmp.mkdir(parents=True, exist_ok=True)
-    write_wav(tmp / "bgm.wav", bgm(duration))
+    cfg = ROOT.parent / "studio/config.json"
+    chosen = json.loads(cfg.read_text()).get("bgm") if cfg.exists() else None
+    bgm_path = ROOT.parent / "assets/audio/bgm" / chosen if chosen else None
+    if not (bgm_path and bgm_path.exists()):  # 没选或文件不在：用合成的木琴循环
+        bgm_path = tmp / "bgm.wav"
+        write_wav(bgm_path, bgm(duration))
     fx = np.zeros(int(SR * (duration + 1)))
     if "sfx" in tl:  # 每期模板：时间轴里直接列出 [时刻, 音效, 音量]
         events = [(t, SFX[kind], vol) for t, kind, vol in tl["sfx"]]
@@ -118,7 +123,7 @@ def build_tracks(duration: float, tl: dict, tmp: Path) -> tuple[Path, Path]:
         a = int(SR * t)
         fx[a:a + len(s)] += s[: max(0, len(fx) - a)]
     write_wav(tmp / "sfx.wav", fx)
-    return tmp / "bgm.wav", tmp / "sfx.wav"
+    return bgm_path, tmp / "sfx.wav"
 
 
 def main():
@@ -138,7 +143,7 @@ def main():
         "[voice][ducked][fx]amix=inputs=3:normalize=0:duration=longest,"
         "alimiter=limit=0.89,aresample=48000[out]"
     )
-    subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(src), "-i", str(bgm_wav), "-i", str(sfx_wav),
+    subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(src), "-stream_loop", "-1", "-i", str(bgm_wav), "-i", str(sfx_wav),
                     "-filter_complex", graph, "-map", "0:v", "-map", "[out]",
                     "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ac", "2", "-t", f"{dur:.3f}", str(dst)], check=True)
 

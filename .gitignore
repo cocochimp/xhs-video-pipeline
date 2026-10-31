@@ -18,3 +18,7 @@ projects/*/frames/
 # IDE
 .idea/
 studio/jobs.json
+/studio/usage.json
+/studio/chat.json
+/.taste-skill/
+/episodes/.trash/

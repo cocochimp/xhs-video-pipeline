@@ -1,0 +1,237 @@
+import React, { useRef, useState } from "react";
+import { STAGES, Steps4, ago, api, stageIndex, useApp, usePoll, yuan, type Overview } from "./lib";
+
+type Ep = Overview["episodes"][number];
+type Topic = { title: string; group: string; ep?: string; stage?: string };
+
+const Title: React.FC<{ children: React.ReactNode; right?: React.ReactNode }> = ({ children, right }) => (
+  <div className="titlerow"><h1>{children}</h1><span className="sp" />{right}</div>
+);
+
+export const TodoPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
+  const { toast } = useApp();
+  const del = (e: Ep) => confirm(`删除第 ${e.no} 期「${e.title}」？会移到 episodes/.trash，可以手动找回。`) &&
+    api(`episodes/${e.id}/delete`, {}).then(() => toast("已删除"));
+  return (
+    <>
+      <Title right={<a className="btn primary" href="#new" style={{ display: "inline-flex", alignItems: "center" }}>新建作品</a>}>进行中</Title>
+      {eps.length === 0 ? <div className="empty">没有进行中的作品。<a className="link" href="#new">新建一个</a></div> : (
+        <table>
+          <thead><tr><th>作品</th><th>进度</th><th className="num">花费</th><th className="num">更新</th><th /></tr></thead>
+          <tbody>
+            {[...eps].sort((a, b) => b.updated - a.updated).map((e) => (
+              <tr key={e.id} className="click" onClick={() => (location.hash = `work/${e.id}`)}>
+                <td><span className="muted num">第 {e.no} 期</span>　{e.title}</td>
+                <td><Steps4 stage={e.stage} />　<span className="small">{STAGES[stageIndex(e.stage)][1]}</span></td>
+                <td className="num">{yuan(e.cost)}</td>
+                <td className="num muted">{ago(e.updated)}</td>
+                <td style={{ textAlign: "right" }}><button className="btn ghost" onClick={(ev) => { ev.stopPropagation(); del(e); }}>删除</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+};
+
+export const NewPage: React.FC = () => {
+  const { ask, toast } = useApp();
+  const [topics] = usePoll<Topic[]>("topics", 60000);
+  const [pick, setPick] = useState("");
+  const [own, setOwn] = useState("");
+  const [busy, setBusy] = useState(false);
+  const free = (topics ?? []).filter((t) => !t.ep);
+  const title = own.trim() || pick;
+  const create = () => { setBusy(true); api<{ id: string }>("episodes", { title }).then((r) => (location.hash = `work/${r.id}/text`)).catch((e) => { toast(e.message); setBusy(false); }); };
+  return (
+    <>
+      <Title>新建作品</Title>
+      <div className="grid cols-2">
+        <div className="card">
+          <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}><h2>从选题库挑</h2><span className="sp" /><button className="btn" onClick={() => ask("再帮我想 5 个选题，加进选题库")}>让 AI 再出几个</button></div>
+          <div style={{ maxHeight: 420, overflow: "auto" }}>
+            {free.slice(0, 30).map((t) => (
+              <label key={t.title} className="radio"><input type="radio" name="tp" checked={!own && pick === t.title} onChange={() => { setPick(t.title); setOwn(""); }} />{t.title}<span className="sp" /><span className="small muted">{t.group}</span></label>
+            ))}
+          </div>
+        </div>
+        <div className="card" style={{ alignSelf: "start" }}>
+          <h2>或者自己写</h2>
+          <input type="text" value={own} onChange={(e) => setOwn(e.target.value)} placeholder="一句话说清这期聊什么" />
+          <div style={{ display: "flex", alignItems: "center", marginTop: 16, gap: 12 }}>
+            <span className="small muted" style={{ flex: 1 }}>{title ? `选题：${title}` : "还没选"}</span>
+            <button className="btn primary" disabled={!title || busy} onClick={create}>{busy ? "创建中…" : "确定选题，写文本"}</button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+export const LibraryPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
+  const { toast } = useApp();
+  const [playing, setPlaying] = useState("");
+  const reopen = (e: Ep) => api(`episodes/${e.id}/reopen`, {}).then(() => { toast("已拉回审片台"); location.hash = `work/${e.id}/review`; });
+  return (
+    <>
+      <Title>作品库</Title>
+      {eps.length === 0 ? <div className="empty">还没有完结的作品。审片全部通过并渲染成片后，作品会出现在这里。</div> : (
+        <div className="grid cols-side">
+          <table>
+            <thead><tr><th>作品</th><th className="num">花费</th><th className="num">完结</th><th /></tr></thead>
+            <tbody>
+              {eps.map((e) => (
+                <tr key={e.id} className="click" onClick={() => setPlaying(e.id)}>
+                  <td><span className="muted num">第 {e.no} 期</span>　{e.title}</td>
+                  <td className="num">{yuan(e.cost)}</td>
+                  <td className="num muted">{e.doneAt ? ago(Date.parse(e.doneAt)) : "—"}</td>
+                  <td style={{ textAlign: "right" }}><button className="link" onClick={(ev) => { ev.stopPropagation(); reopen(e); }}>重新审片</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div>{playing ? <video key={playing} src={`/api/video/${playing}`} controls autoPlay /> : <div className="empty card">点一行播放成片</div>}
+            {playing && <div className="small muted" style={{ marginTop: 8 }}>文件在 out/{playing}/{playing}.mp4</div>}</div>
+        </div>
+      )}
+    </>
+  );
+};
+
+type Lib = {
+  voice: { speaker: string; rate: number }; voices: { name: string; speaker: string }[]; bgm: string | null; bgmFiles: string[];
+  sfx: { kind: string; name: string; uses: number }[]; poses: string[]; props: string[]; components: [string, string][];
+};
+
+const play = (url: string) => { const a = new Audio(url); void a.play(); };
+
+export const AudioPage: React.FC<{ tab?: string }> = ({ tab = "voice" }) => {
+  const { ask, toast } = useApp();
+  const [lib, reload] = usePoll<Lib>("library", 10000);
+  const [eps] = usePoll<Overview>("overview", 10000);
+  const file = useRef<HTMLInputElement>(null);
+  const [rate, setRate] = useState<number | null>(null);
+  if (!lib) return null;
+  const cur = lib.voice;
+  const r = rate ?? cur.rate;
+  const open = (eps?.episodes ?? []).filter((e) => e.stage !== "done" && e.stage !== "text" && e.stage !== "topic").length;
+  const setVoice = (v: object, msg: string) => api("config", { voice: v }).then(() => { reload(); toast(msg); });
+  const preview = (speaker: string) => { toast("合成试听中，约 ¥0.01"); api<{ url: string }>("voice", { speaker, rate: r }).then((x) => play(x.url)).catch((e) => toast(e.message)); };
+  const upload = (f: File) => fetch(`/api/upload?name=${encodeURIComponent(f.name)}`, { method: "POST", body: f }).then(() => { reload(); toast("已上传"); });
+  const addVoice = () => {
+    const speaker = prompt("豆包语音 2.0 的音色 ID（在火山引擎音色列表里复制）"); if (!speaker) return;
+    const name = prompt("给它起个名字") || speaker;
+    api("config", { addVoice: { name, speaker } }).then(reload);
+  };
+  const tabs = [["voice", "配音"], ["bgm", "背景音乐"], ["sfx", "音效"]];
+  return (
+    <>
+      <Title right={tab === "voice" ? <button className="btn" onClick={addVoice}>添加音色</button> : tab === "bgm" ?
+        <><input ref={file} type="file" accept=".mp3,.wav,.m4a" hidden onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} /><button className="btn" onClick={() => file.current?.click()}>上传</button></> : null}>音效库</Title>
+      <div className="tabs" role="tablist">{tabs.map(([k, n]) => <button key={k} role="tab" className={`tab ${k === tab ? "on" : ""}`} onClick={() => (location.hash = `audio/${k}`)}>{n}</button>)}</div>
+      {tab === "voice" && (
+        <table>
+          <thead><tr><th>音色</th><th>音色 ID</th><th /></tr></thead>
+          <tbody>
+            {lib.voices.map((v) => {
+              const on = v.speaker === cur.speaker;
+              return (
+                <tr key={v.speaker}>
+                  <td>{v.name}　{on && <span className="pill pos">当前使用</span>}</td>
+                  <td className="mono small muted">{v.speaker}</td>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    {on && <label className="small muted" style={{ marginRight: 16 }}>语速 <input type="range" min={-50} max={50} value={r} onChange={(e) => setRate(+e.target.value)} onMouseUp={() => setVoice({ rate: r }, `语速改为 ${r}，之后新配的音生效`)} style={{ verticalAlign: "middle", width: 120 }} /> <span className="num">{r > 0 ? `+${r}` : r}</span></label>}
+                    <button className="btn ghost" onClick={() => preview(v.speaker)}>试听</button>
+                    {!on && <button className="btn ghost" onClick={() => confirm(`切换到「${v.name}」？${open ? `有 ${open} 个进行中的作品，下次改台词或生成时会按新音色重配。` : ""}`) && setVoice({ speaker: v.speaker }, `已切换到 ${v.name}`)}>设为当前</button>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+      {tab === "bgm" && (
+        <table>
+          <thead><tr><th>背景音乐</th><th /></tr></thead>
+          <tbody>
+            {[null, ...lib.bgmFiles].map((f) => (
+              <tr key={f ?? "builtin"}>
+                <td>{f ?? "木琴循环（程序合成，占位）"}　{lib.bgm === f && <span className="pill pos">当前使用</span>}</td>
+                <td style={{ textAlign: "right" }}>
+                  <button className="btn ghost" onClick={() => play(f ? `/assets/audio/bgm/${encodeURIComponent(f)}` : "/library/bgm_builtin.wav")}>试听</button>
+                  {lib.bgm !== f && <button className="btn ghost" onClick={() => api("config", { bgm: f }).then(() => { reload(); toast("下次渲染生效"); })}>设为当前</button>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {tab === "sfx" && (
+        <table>
+          <thead><tr><th>音效</th><th>代号</th><th className="num">用在几处</th><th /></tr></thead>
+          <tbody>
+            {lib.sfx.map((s) => (
+              <tr key={s.kind}>
+                <td>{s.name}</td><td className="mono small muted">{s.kind}</td><td className="num">{s.uses}</td>
+                <td style={{ textAlign: "right" }}><button className="btn ghost" onClick={() => play(`/library/sfx_${s.kind}.wav`)}>试听</button>
+                  <button className="btn ghost" onClick={() => ask(`「${s.name}」(${s.kind}) 这个音效我想换一下：`)}>让 AI 换</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+};
+
+export const ComponentsPage: React.FC = () => {
+  const { ask } = useApp();
+  const [lib] = usePoll<Lib>("library", 10000);
+  if (!lib) return null;
+  const label = (f: string) => f.replace(/^(pose|prop)_|\.png$/g, "");
+  const Tiles: React.FC<{ files: string[]; kind: string }> = ({ files, kind }) => (
+    <div className="tiles">
+      {files.map((f) => (
+        <div key={f} className="tile"><img src={`/assets/${f}`} alt={label(f)} loading="lazy" />
+          <div className="row"><span className="mono small">{label(f)}</span><span className="sp" /><button className="link small" onClick={() => ask(`重画${kind}「${label(f)}」：`)}>重画</button></div></div>
+      ))}
+      <button className="tile add" onClick={() => ask(`新画一个${kind}：`)}>让 AI 画一个新的</button>
+    </div>
+  );
+  return (
+    <>
+      <Title>组件库</Title>
+      <div className="grid">
+        <section><h2 style={{ marginBottom: 12 }}>阿牛姿势 <span className="muted small num">{lib.poses.length}</span></h2><Tiles files={lib.poses} kind="阿牛姿势" /></section>
+        <section><h2 style={{ marginBottom: 12 }}>道具 <span className="muted small num">{lib.props.length}</span></h2><Tiles files={lib.props} kind="道具" /></section>
+        <section><h2 style={{ marginBottom: 12 }}>动画组件</h2>
+          <table><thead><tr><th>组件</th><th>效果</th></tr></thead>
+            <tbody>{lib.components.map(([n, d]) => <tr key={n}><td className="mono small">{n}</td><td>{d}</td></tr>)}</tbody></table></section>
+      </div>
+    </>
+  );
+};
+
+export const TopicsPage: React.FC = () => {
+  const { ask } = useApp();
+  const [topics] = usePoll<Topic[]>("topics", 30000);
+  const [group, setGroup] = useState("");
+  const groups = [...new Set((topics ?? []).map((t) => t.group))];
+  const rows = (topics ?? []).filter((t) => !group || t.group === group);
+  return (
+    <>
+      <Title right={<button className="btn" onClick={() => ask("再帮我想 5 个选题，加进选题库")}>让 AI 出选题</button>}>选题库 <span className="muted small num">{topics?.length ?? ""}</span></Title>
+      <div style={{ width: 240, marginBottom: 16 }}><select value={group} onChange={(e) => setGroup(e.target.value)}><option value="">全部分类</option>{groups.map((g) => <option key={g}>{g}</option>)}</select></div>
+      <table>
+        <thead><tr><th>选题</th><th>分类</th><th>状态</th></tr></thead>
+        <tbody>{rows.map((t) => (
+          <tr key={t.title} className={t.ep ? "click" : ""} onClick={() => t.ep && (location.hash = `work/${t.ep}`)}>
+            <td>{t.title}</td><td className="muted small">{t.group}</td>
+            <td>{t.ep ? <span className={`pill ${t.stage === "done" ? "pos" : "acc"}`}>{t.stage === "done" ? "已完结" : STAGES[stageIndex(t.stage!)][1] + "中"}</span> : <span className="muted small">—</span>}</td>
+          </tr>
+        ))}</tbody>
+      </table>
+    </>
+  );
+};

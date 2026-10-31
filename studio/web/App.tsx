@@ -1,129 +1,118 @@
-import { Player, type PlayerRef } from "@remotion/player";
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { EPISODES } from "../../episodes";
-import { Episode } from "../../shared/Episode";
-import { FPS, f } from "../../shared/theme";
-import type { EpisodeJson, EpisodeModule } from "../../shared/types";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { AppCtx, api, usePoll, type Overview } from "./lib";
+import { AudioPage, ComponentsPage, LibraryPage, NewPage, TodoPage, TopicsPage } from "./pages";
+import { WorkPage } from "./Work";
 
-type Round = { n: number; issue: string; summary: string; cost: number; at: string; undone?: boolean };
-type Scene = Omit<EpisodeJson["scenes"][number], "rounds"> & { updated?: boolean; voiceUpdated?: boolean; costWarn?: boolean; rounds: Round[] };
+const NAV = [
+  ["审片台", [["new", "新建作品"], ["todo", "进行中"], ["done", "作品库"]]],
+  ["素材库", [["audio", "音效库"], ["comp", "组件库"], ["topics", "选题库"]]],
+] as const;
+const NAMES: Record<string, string> = { new: "新建作品", todo: "进行中", done: "作品库", audio: "音效库", comp: "组件库", topics: "选题库", work: "作品" };
 
-const STATUS: Record<string, string> = { pending: "⏳ 待审", queued: "🕒 排队中", working: "🔄 AI 修改中", approved: "✅ 已通过", asking: "💬 待你回复", error: "⚠️ 出错" };
-const api = (p: string, body?: object) => fetch(`/api/${p}`, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}).then((r) => r.json());
-const box: React.CSSProperties = { background: "#fff", borderRadius: 10, border: "1px solid #e4ddcf" };
-const btn = (bg: string): React.CSSProperties => ({ background: bg, color: "#fff", border: 0, borderRadius: 8, padding: "8px 16px", fontSize: 14, cursor: "pointer" });
+const useHash = () => {
+  const [h, setH] = useState(location.hash.slice(1) || "todo");
+  useEffect(() => { const f = () => setH(location.hash.slice(1) || "todo"); addEventListener("hashchange", f); return () => removeEventListener("hashchange", f); }, []);
+  return h.split("/");
+};
 
 export const App: React.FC = () => {
-  const [id, setId] = useState(location.hash.slice(1));
-  useEffect(() => { const h = () => setId(location.hash.slice(1)); addEventListener("hashchange", h); return () => removeEventListener("hashchange", h); }, []);
-  return id ? <EpisodePage id={id} /> : <Home />;
-};
+  const [page, arg, sub] = useHash();
+  const [ov] = usePoll<Overview>("overview", 3000);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [toastMsg, setToast] = useState("");
+  const toast = useCallback((t: string) => { setToast(t); setTimeout(() => setToast(""), 2200); }, []);
+  const ask = useCallback((t: string) => { setDraft(t); setChatOpen(true); }, []);
 
-const Home: React.FC = () => {
-  const [eps, setEps] = useState<EpisodeJson[]>([]);
-  useEffect(() => { api("episodes").then(setEps); }, []);
-  return (
-    <div style={{ maxWidth: 800, margin: "40px auto" }}>
-      <h2>阿牛审片台</h2>
-      {eps.map((e) => {
-        const ok = e.scenes.filter((s) => s.status === "approved").length;
-        return (
-          <a key={e.id} href={`#${e.id}`} style={{ ...box, display: "block", padding: 16, marginBottom: 10, color: "#222", textDecoration: "none" }}>
-            <b>第 {e.no} 期</b>　{e.title}　<span style={{ color: "#888" }}>已通过 {ok}/{e.scenes.length} · ¥{(e.cost.tts + e.cost.image).toFixed(2)}</span>
-          </a>
-        );
-      })}
-    </div>
-  );
-};
+  const eps = ov?.episodes ?? [];
+  const todo = eps.filter((e) => e.stage !== "done");
+  const done = eps.filter((e) => e.stage === "done");
+  const ep = page === "work" ? eps.find((e) => e.id === arg) : undefined;
+  const where = ep ? `第 ${ep.no} 期 · ${ep.title}` : NAMES[page] ?? "";
+  const imgCost = eps.reduce((s, e) => s + e.cost, 0);
+  const u = ov?.usage;
 
-const EpisodePage: React.FC<{ id: string }> = ({ id }) => {
-  const mod = EPISODES.find((m) => m.episode.id === id);
-  const [ep, setEp] = useState<EpisodeJson | null>(null);
-  const [sel, setSel] = useState<string>("");
-  const [whole, setWhole] = useState(false);
-  const [issue, setIssue] = useState("");
-  const player = useRef<PlayerRef>(null);
-
-  useEffect(() => {
-    const load = () => api(`episodes/${id}`).then((e: EpisodeJson) => { setEp(e); setSel((s) => s || e.scenes[0].id); });
-    load();
-    const t = setInterval(load, 2000);
-    return () => clearInterval(t);
-  }, [id]);
-
-  if (!mod || !ep) return <div style={{ padding: 40 }}>加载中…（找不到这一期的话，检查 episodes/index.ts）</div>;
-  const scenes = ep.scenes as unknown as Scene[];
-  const sc = scenes.find((s) => s.id === sel) ?? scenes[0];
-  const ok = scenes.filter((s) => s.status === "approved").length;
-  const span = mod.timeline.scenes[sc.id];
-  const busy = sc.status === "queued" || sc.status === "working";
-  const submit = () => issue.trim() && api(`episodes/${id}/scenes/${sc.id}/edit`, { issue }).then(() => setIssue(""));
+  const content = {
+    todo: <TodoPage eps={todo} />, new: <NewPage />, done: <LibraryPage eps={done} />,
+    audio: <AudioPage tab={arg} />, comp: <ComponentsPage />, topics: <TopicsPage />,
+    work: <WorkPage id={arg} tab={sub} />,
+  }[page] ?? <TodoPage eps={todo} />;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <div style={{ ...box, borderRadius: 0, display: "flex", alignItems: "center", gap: 16, padding: "10px 20px" }}>
-        <a href="#">← 全部期数</a>
-        <b>第 {ep.no} 期 · {ep.title}</b>
-        <span style={{ color: "#888" }}>已通过 {ok}/{scenes.length} · 花费 ¥{(ep.cost.tts + ep.cost.image).toFixed(2)}</span>
-        <span style={{ flex: 1 }} />
-        <button style={btn(ok === scenes.length ? "#e2702b" : "#bbb")} disabled={ok !== scenes.length} onClick={() => api(`episodes/${id}/render`, {})}>渲染整期</button>
-        <button style={btn("#888")} onClick={() => api(`episodes/${id}/render`, { draft: true })}>强制渲染草稿</button>
-      </div>
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        <div style={{ width: 380, overflow: "auto", padding: 12 }}>
-          {scenes.map((s) => {
-            const sp = mod.timeline.scenes[s.id];
-            return (
-              <div key={s.id} onClick={() => setSel(s.id)} style={{ ...box, display: "flex", gap: 10, padding: 8, marginBottom: 8, cursor: "pointer",
-                outline: s.id === sc.id ? "2px solid #e2702b" : "none", opacity: s.status === "approved" ? 0.55 : 1 }}>
-                <img src={`/thumbs/${id}/${s.id}.jpg?${s.rounds?.length ?? 0}`} style={{ width: 96, height: 72, objectFit: "cover", borderRadius: 6, background: "#eee" }} />
-                <div style={{ fontSize: 13, lineHeight: 1.6 }}>
-                  <b>{s.id} {s.name}</b> · {sp ? (sp.end - sp.start).toFixed(1) : "?"}s<br />
-                  {STATUS[s.status] ?? s.status}
-                  {s.updated && " · 已更新"}{s.voiceUpdated && " · 配音已更新"}{s.costWarn && <span style={{ color: "#d33" }}> · 本轮 ¥{s.rounds.at(-1)?.cost}</span>}
-                  <div style={{ color: "#888" }}>{s.lines[0]?.zh.replace(/[【】]/g, "")}</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        <div style={{ flex: 1, padding: 16, overflow: "auto" }}>
-          <Preview mod={mod} start={whole ? 0 : Math.max(0, span.start - 0.5)} end={whole ? mod.timeline.duration : Math.min(mod.timeline.duration, span.end + 0.5)} player={player} />
-          <label style={{ fontSize: 13 }}><input type="checkbox" checked={whole} onChange={(e) => setWhole(e.target.checked)} /> 整期播放</label>
-          <div style={{ ...box, padding: 14, marginTop: 12 }}>
-            <b>{sc.id} {sc.name}</b> · {STATUS[sc.status]}
-            <div style={{ fontSize: 13, color: "#666", margin: "6px 0" }}>{sc.visual}</div>
-            <div style={{ fontSize: 13 }}>{sc.lines.map((l, i) => <div key={i}>· {l.zh}</div>)}</div>
-            <textarea value={issue} onChange={(e) => setIssue(e.target.value)} disabled={busy} placeholder="这一片哪里不满意？比如：150万砸下来再慢一点"
-              style={{ width: "100%", height: 64, marginTop: 10, padding: 8, fontSize: 14, boxSizing: "border-box" }} />
-            <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
-              <button style={btn(busy ? "#bbb" : "#e2702b")} disabled={busy} onClick={submit}>交给 AI 修改</button>
-              <button style={btn("#22a04b")} disabled={busy} onClick={() => api(`episodes/${id}/scenes/${sc.id}/approve`, {})}>通过</button>
-            </div>
-            <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.8 }}>
-              <b>修改记录</b>
-              {(sc.rounds ?? []).length === 0 && <div style={{ color: "#999" }}>还没有修改</div>}
-              {[...(sc.rounds ?? [])].reverse().map((r) => (
-                <div key={r.n} style={{ opacity: r.undone ? 0.45 : 1, color: r.cost > 1 ? "#d33" : undefined }}>
-                  第 {r.n} 轮：你「{r.issue}」→ {r.summary || "（无说明）"}{r.cost ? ` · ¥${r.cost}` : ""}{r.undone ? " · 已撤销" : ""}
-                  {!r.undone && !busy && <a href="#" onClick={(e) => { e.preventDefault(); api(`episodes/${id}/scenes/${sc.id}/undo`, { round: r.n }); }} style={{ marginLeft: 8 }}>撤销到此前</a>}
-                </div>
-              ))}
-            </div>
+    <AppCtx.Provider value={{ ask, toast, page: where }}>
+      <div className="app">
+        <aside className="side">
+          <div className="brand"><img src="/assets/avatar.jpg" alt="" /><div><b>阿牛要退休</b><span className="small muted">阿牛工作台</span></div></div>
+          <div className="fire small muted">
+            <div style={{ display: "flex", justifyContent: "space-between" }}><span>FIRE 计划</span><span className="num">{done.length} / 100 期</span></div>
+            <div className="bar"><i style={{ width: `${done.length}%` }} /></div>
           </div>
+          {NAV.map(([g, items]) => (
+            <React.Fragment key={g}>
+              <div className="group">{g}</div>
+              {items.map(([k, n]) => (
+                <a key={k} href={`#${k}`} className={`nav ${(page === k || (page === "work" && k === (ep?.stage === "done" ? "done" : "todo"))) ? "on" : ""}`}>
+                  {n}{k === "todo" && todo.length > 0 && <span className="count num">{todo.length}</span>}
+                </a>
+              ))}
+            </React.Fragment>
+          ))}
+          <div className="spend">
+            <div><span>画面 + 配音（累计）</span><b className="num">¥{imgCost.toFixed(2)}</b></div>
+            <div><span>AI（本月，官方价折算）</span><b className="num">{u ? `$${u.aiMonthUsd.toFixed(2)}` : "—"}</b></div>
+            <div><span>packyapi 余额</span><b className="num">{u?.packyUsd != null ? `$${u.packyUsd.toFixed(2)}` : "未配置"}</b></div>
+          </div>
+        </aside>
+        <header className="topbar">
+          <span className="crumb">{page === "work" && ep ? <><a href={ep.stage === "done" ? "#done" : "#todo"}>{ep.stage === "done" ? "作品库" : "进行中"}</a> / <b>第 {ep.no} 期</b></> : <b>{NAMES[page] ?? "进行中"}</b>}</span>
+          <span className="sp" />
+          <button className={`btn ${chatOpen ? "" : "primary"}`} onClick={() => setChatOpen(!chatOpen)}>{chatOpen ? "收起 AI 助手" : "问 AI"}</button>
+        </header>
+        <div className="body">
+          <main className="sheet">{content}</main>
+          {chatOpen && <Chat where={where} draft={draft} setDraft={setDraft} onClose={() => setChatOpen(false)} />}
         </div>
       </div>
-    </div>
+      {toastMsg && <div className="toast" role="status">{toastMsg}</div>}
+    </AppCtx.Provider>
   );
 };
 
-const Preview: React.FC<{ mod: EpisodeModule; start: number; end: number; player: React.RefObject<PlayerRef | null> }> = ({ mod, start, end, player }) => {
-  const C = useMemo(() => () => <Episode ep={mod} />, [mod]);
+type Msg = { role: "me" | "ai"; text: string; plan?: string | null; page?: string };
+
+const Chat: React.FC<{ where: string; draft: string; setDraft: (s: string) => void; onClose: () => void }> = ({ where, draft, setDraft, onClose }) => {
+  const [data, reload] = usePoll<{ busy: boolean; messages: Msg[] }>("chat", 1500);
+  const [jobs] = usePoll<{ kind: string; state: string }[]>("jobs", 2000);
+  const box = useRef<HTMLDivElement>(null);
+  const msgs = data?.messages ?? [];
+  const applying = jobs?.some((j) => j.kind === "apply" && (j.state === "queued" || j.state === "running"));
+  useEffect(() => { box.current?.scrollTo(0, 1e9); }, [msgs.length, data?.busy]);
+  const send = () => { if (!draft.trim() || data?.busy) return; api("chat", { msg: draft, page: where }).then(() => { setDraft(""); reload(); }); };
+  const lastPlan = [...msgs].reverse().find((m) => m.role === "ai");
+
   return (
-    <div style={{ ...box, overflow: "hidden", maxWidth: 800 }}>
-      <Player ref={player} component={C} durationInFrames={f(mod.timeline.duration)} fps={FPS} compositionWidth={1440} compositionHeight={1080}
-        style={{ width: "100%" }} controls loop inFrame={f(start)} outFrame={Math.max(f(start) + 1, f(end) - 1)} key={`${start}-${end}`} />
-    </div>
+    <aside className="chat" aria-label="AI 助手">
+      <header><h2>AI 助手</h2><span className="sp" /><button className="btn ghost" onClick={() => api("chat/new", {}).then(reload)}>新对话</button><button className="btn ghost" onClick={onClose} aria-label="收起">收起</button></header>
+      <div className="ctx">正在看：{where || "工作台"}</div>
+      <div className="msgs" ref={box}>
+        {msgs.length === 0 && <div className="muted small">可以让 AI 换音效、重画阿牛的姿势、加选题、调整配音。要改文件时，它会先说明改什么、花多少钱，你确认后才执行。</div>}
+        {msgs.map((m, i) => (
+          <div key={i} className={`msg ${m.role}`}>
+            {m.text}
+            {m.plan && m === lastPlan && (
+              <div className="plan"><div className="small muted">要执行的改动</div>{m.plan}
+                <div className="acts"><button className="btn primary" disabled={applying} onClick={() => api("chat/apply", {})}>{applying ? "执行中…" : "确认执行"}</button>
+                  <button className="btn" onClick={() => setDraft("先不改，")}>先不改</button></div></div>
+            )}
+          </div>
+        ))}
+        {data?.busy && <div className="msg ai muted">思考中…</div>}
+      </div>
+      <div className="composer">
+        <textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="比如：把片尾的音效换成更轻的叮一声"
+          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) send(); }} />
+        <div style={{ display: "flex", alignItems: "center", marginTop: 8 }}><span className="small muted">⌘ + 回车发送</span><span className="sp" /><button className="btn primary" disabled={!draft.trim() || data?.busy} onClick={send}>发送</button></div>
+      </div>
+    </aside>
   );
 };
