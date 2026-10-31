@@ -50,7 +50,7 @@ export function studioApi(root: string): Plugin {
 
   const argsOf = (j: Job): string[] => {
     const ep = `episodes/${j.ep}`;
-    if (j.kind === "render") return ["tools/render.py", ep, ...(j.arg === "draft" ? ["--draft"] : [])];
+    if (j.kind === "render") return ["tools/render.py", ep, ...(j.arg ? [`--${j.arg}`] : [])];
     if (j.kind === "edit" || j.kind === "undo") return ["-m", "studio.edit", j.kind, ep, j.scene!, j.arg!];
     if (j.kind === "apply") return ["-m", "studio.work", "apply", j.arg!];
     return ["-m", "studio.work", j.kind, ep, ...(j.arg ? [j.arg] : [])];
@@ -61,7 +61,7 @@ export function studioApi(root: string): Plugin {
     j.state = code === 0 ? "done" : "error";
     j.result = result;
     if (code !== 0 && j.scene) setScene(j.ep!, j.scene, { status: "error" });
-    if (code === 0 && j.kind === "render" && j.arg !== "draft") patchEp(j.ep!, { stage: "done", doneAt: new Date().toISOString() });
+    if (code === 0 && j.kind === "render" && !j.arg) patchEp(j.ep!, { stage: "done", doneAt: new Date().toISOString() });
   };
 
   const pump = async () => {
@@ -106,7 +106,7 @@ export function studioApi(root: string): Plugin {
     const sfxUses: Record<string, number> = {};
     for (const id of epIds()) for (const s of readEp(id).scenes ?? []) for (const x of s.sfx ?? []) sfxUses[x.kind] = (sfxUses[x.kind] ?? 0) + 1;
     return {
-      voice: c.voice, voices: c.voices ?? [{ name: "温暖阿虎 2.0", speaker: c.voice?.speaker }], bgm: c.bgm ?? null,
+      mix: { bgm: c.mix?.bgm ?? 1, sfx: c.mix?.sfx ?? {} }, voice: c.voice, voices: c.voices ?? [{ name: "温暖阿虎 2.0", speaker: c.voice?.speaker }], bgm: c.bgm ?? null,
       bgmFiles: files("assets/audio/bgm", /\.(mp3|wav|m4a)$/i),
       sfx: [["pop", "弹出"], ["stamp", "盖章"], ["whoosh", "滑动"], ["tick", "滚动咔哒"], ["ding", "叮"]].map(([kind, name]) => ({ kind, name, uses: sfxUses[kind] ?? 0 })),
       poses: files("assets", /^pose_.+\.png$/), props: files("assets", /^prop_.+\.png$/),
@@ -120,7 +120,7 @@ export function studioApi(root: string): Plugin {
       const scenes = e.scenes ?? [];
       return { id, no: e.no, title: e.title, stage: e.stage, cost: (e.cost?.tts ?? 0) + (e.cost?.image ?? 0), doneAt: e.doneAt,
         updated: fs.statSync(path.join(epDir(id), "episode.json")).mtimeMs, scenes: scenes.length,
-        video: fs.existsSync(P("out", id, `${id}.mp4`)) };
+        video: fs.existsSync(P("out", id, `${id}.mp4`)), hd: fs.existsSync(P("out", id, `${id}-hd.mp4`)) };
     }),
     usage: usageSummary(),
   });
@@ -166,11 +166,17 @@ export function studioApi(root: string): Plugin {
             if (GET && u[0] === "library") return send(200, library());
             if (GET && u[0] === "topics") return send(200, topics());
             if (GET && u[0] === "chat") return send(200, { busy: chatBusy, messages: readJson(P("studio/chat.json"), []) });
-            if (GET && u[0] === "video" && fs.existsSync(P("out", u[1], `${u[1]}.mp4`))) return sendFile(res, P("out", u[1], `${u[1]}.mp4`), req.headers.range);
+            if (GET && u[0] === "video") {
+              const name = `${u[1]}${q.get("hd") ? "-hd" : ""}.mp4`, file = P("out", u[1], name);
+              if (!/^ep\d+$/.test(u[1] ?? "") || !fs.existsSync(file)) return send(404, { error: "还没有这个视频" });
+              if (q.get("download")) res.setHeader("content-disposition", `attachment; filename="${name}"`);
+              return sendFile(res, file, req.headers.range);
+            }
             if (POST && u[0] === "config") {
               const c = config();
               if (data.voice) c.voice = { ...c.voice, ...data.voice };
               if ("bgm" in data) c.bgm = data.bgm;
+              if (data.mix) c.mix = { bgm: data.mix.bgm ?? c.mix?.bgm ?? 1, sfx: { ...(c.mix?.sfx ?? {}), ...(data.mix.sfx ?? {}) } };
               if (data.addVoice?.speaker) c.voices = [...(c.voices ?? library().voices), data.addVoice];
               saveConfig(c);
               return send(200, { ok: true });
@@ -214,6 +220,13 @@ export function studioApi(root: string): Plugin {
               await pyRun(["-m", "studio.work", "register"]);
               return send(200, { ok: true });
             }
+            if (POST && act === "approve-all") { // 在完整视频里直接整期通过：全部片通过并渲染成片，完成后进作品库
+              const e = readEp(id);
+              e.scenes.forEach((s: Record<string, unknown>) => Object.assign(s, { status: "approved", updated: false, voiceUpdated: false }));
+              writeEp(id, e);
+              return enqueue({ ep: id, kind: "render", arg: "" }), send(200, { ok: true });
+            }
+            if (POST && act === "export") return enqueue({ ep: id, kind: "render", arg: "hd" }), send(200, { ok: true });
             if (POST && act === "render") return enqueue({ ep: id, kind: "render", arg: data.draft ? "draft" : "" }), send(200, { ok: true });
             if (POST && sact === "edit") {
               if (!data.issue?.trim()) return send(400, { error: "问题不能为空" });

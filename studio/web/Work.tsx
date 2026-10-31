@@ -123,7 +123,7 @@ const GenStep: React.FC<{ ep: Ep; job?: Job }> = ({ ep, job }) => {
 
 const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) => {
   const mod = EPISODES.find((m) => m.episode.id === ep.id);
-  const [lib] = usePoll<{ bgm: string | null }>("library", 30000);
+  const [lib] = usePoll<{ bgm: string | null; mix: { bgm: number; sfx: Record<string, number> } }>("library", 30000);
   const bgm = lib?.bgm ? `/assets/audio/bgm/${encodeURIComponent(lib.bgm)}` : "/library/bgm_builtin.wav";
   const [sel, setSel] = useState("all");
   const [issue, setIssue] = useState("");
@@ -173,15 +173,21 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
         </div>
 
         <div>
-          <Preview mod={mod} start={whole ? 0 : Math.max(0, span.start - 0.5)} end={whole ? dur : Math.min(dur, span.end + 0.5)} bgm={bgm} />
+          <Preview mod={mod} start={whole ? 0 : Math.max(0, span.start - 0.5)} end={whole ? dur : Math.min(dur, span.end + 0.5)} bgm={bgm} mix={lib?.mix} />
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "8px 0 var(--gap)" }}>
             <span className="small muted">{whole ? "完整视频" : `${sc.id} ${sc.name}，前后各多放 0.5 秒`}</span>
             <span className="sp" />
             <button className="btn" disabled={rendering} onClick={() => api(`episodes/${ep.id}/render`, { draft: true })}>渲染草稿</button>
-            <button className="btn primary" disabled={ok < ep.scenes.length || rendering} onClick={() => api(`episodes/${ep.id}/render`, {})}>
-              {rendering ? "渲染中…" : "全部通过 · 渲染成片"}</button>
+            {whole ? (
+              <button className="btn primary" disabled={rendering} onClick={() => confirm("整期通过？所有片标为通过，渲染成片后进入作品库。") &&
+                api(`episodes/${ep.id}/approve-all`, {})}>{rendering ? "渲染成片中…" : "整期通过，进作品库"}</button>
+            ) : (
+              <button className="btn primary" disabled={ok < ep.scenes.length || rendering} onClick={() => api(`episodes/${ep.id}/render`, {})}>
+                {rendering ? "渲染中…" : "全部通过 · 渲染成片"}</button>
+            )}
           </div>
           {renderJob?.state === "error" && <div className="notice neg" style={{ marginBottom: 12 }}>渲染失败：{renderJob.result?.error}</div>}
+          {rendering && whole && <div className="notice" style={{ marginBottom: 12 }}>正在渲染成片，大约 2～4 分钟，完成后自动进入作品库。</div>}
 
           {!whole && <div className="card">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><h2>{sc.id} {sc.name}</h2><span className={`pill ${cls}`}>{label}</span>
@@ -216,16 +222,15 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
 };
 
 /** 一个播放器，选片时跳到这一片开头播一次，到结尾自动停 */
-const Preview: React.FC<{ mod: EpisodeModule; start: number; end: number; bgm: string }> = ({ mod, start, end, bgm }) => {
+const Preview: React.FC<{ mod: EpisodeModule; start: number; end: number; bgm: string; mix?: { bgm: number; sfx: Record<string, number> } }> = ({ mod, start, end, bgm, mix }) => {
   const ref = useRef<PlayerRef>(null);
-  const C = useMemo(() => () => <Episode ep={mod} preview={{ bgm }} />, [mod, bgm]);
+  const C = useMemo(() => () => <Episode ep={mod} preview={{ bgm, mix }} />, [mod, bgm, JSON.stringify(mix)]);
   const s = f(start), e = Math.max(f(start) + 1, f(end) - 1);
   useEffect(() => {
     const p = ref.current;
     if (!p) return;
     p.pause();
-    p.seekTo(s);
-    p.play();
+    p.seekTo(s); // 只跳到开头，不自动播放
     let prev = s;
     const stop = ({ detail }: { detail: { frame: number } }) => { // 播过这一片结尾才停；手动拖到后面不拦
       if (prev < e && detail.frame >= e && p.isPlaying()) p.pause();

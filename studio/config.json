@@ -1,6 +1,16 @@
 {
   "voice": {
     "speaker": "zh_male_wennuanahu_uranus_bigtts",
-    "rate": 27
+    "rate": 25
+  },
+  "mix": {
+    "bgm": 0.8,
+    "sfx": {
+      "pop": 0.8,
+      "stamp": 0.8,
+      "whoosh": 0.8,
+      "tick": 0.8,
+      "ding": 0.8
+    }
   }
 }

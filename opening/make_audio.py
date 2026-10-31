@@ -114,6 +114,13 @@ def sfx_ding() -> np.ndarray:
 SFX = {"pop": sfx_pop, "stamp": sfx_stamp, "whoosh": sfx_whoosh, "tick": sfx_tick, "ding": sfx_ding}
 
 
+def mix_config() -> dict:
+    """studio/config.json 里的音量倍数：{"bgm": 倍数, "sfx": {种类: 倍数}}，没有就是 1。"""
+    cfg = ROOT.parent / "studio/config.json"
+    mix = (json.loads(cfg.read_text()).get("mix") if cfg.exists() else None) or {}
+    return {"bgm": mix.get("bgm", 1.0), "sfx": mix.get("sfx", {})}
+
+
 def build_tracks(duration: float, tl: dict, tmp: Path) -> tuple[Path, Path]:
     tmp.mkdir(parents=True, exist_ok=True)
     cfg = ROOT.parent / "studio/config.json"
@@ -124,7 +131,8 @@ def build_tracks(duration: float, tl: dict, tmp: Path) -> tuple[Path, Path]:
         write_wav(bgm_path, bgm(duration))
     fx = np.zeros(int(SR * (duration + 1)))
     if "sfx" in tl:  # 每期模板：时间轴里直接列出 [时刻, 音效, 音量]
-        events = [(t, SFX[kind], vol) for t, kind, vol in tl["sfx"]]
+        mix = mix_config()
+        events = [(t, SFX[kind], vol * mix["sfx"].get(kind, 1.0)) for t, kind, vol in tl["sfx"]]
     else:  # 开头复刻版
         m, segs = tl["marks"], tl["segments"]
         events = [(m["scared"], sfx_whoosh, 0.8), (m["glow"], sfx_pop, 0.6), (m["read"], sfx_pop, 0.5),
@@ -148,11 +156,12 @@ def main():
     ff = imageio_ffmpeg.get_ffmpeg_exe()
     dur = float(tl["duration"])
     bgm_wav, sfx_wav = build_tracks(dur, tl, dst.parent / "audio")
+    bgm_vol = round(0.8 * mix_config()["bgm"], 3)
     graph = (
         "[0:a]aresample=44100,pan=mono|c0=0.5*c0+0.5*c1,"
         "acompressor=threshold=-20dB:ratio=3:attack=5:release=80:makeup=4,"
         "loudnorm=I=-15:TP=-1.5:LRA=7,apad,asplit=2[voice][key];"
-        "[1:a]loudnorm=I=-22:TP=-3:LRA=11,volume=0.8[bgm];"
+        f"[1:a]loudnorm=I=-22:TP=-3:LRA=11,volume={bgm_vol}[bgm];"
         "[bgm][key]sidechaincompress=threshold=0.05:ratio=3:attack=20:release=250[ducked];"
         "[2:a]volume=0.9[fx];"
         "[voice][ducked][fx]amix=inputs=3:normalize=0:duration=longest,"

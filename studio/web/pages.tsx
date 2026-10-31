@@ -72,6 +72,8 @@ export const NewPage: React.FC = () => {
 export const LibraryPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
   const { toast } = useApp();
   const [playing, setPlaying] = useState("");
+  const [jobs] = usePoll<{ ep?: string; kind: string; state: string; arg?: string }[]>("jobs", 3000);
+  const exporting = (id: string) => jobs?.some((j) => j.ep === id && j.kind === "render" && j.arg === "hd" && (j.state === "queued" || j.state === "running"));
   const reopen = (e: Ep) => api(`episodes/${e.id}/reopen`, {}).then(() => { toast("已拉回审片台"); location.hash = `work/${e.id}/review`; });
   return (
     <>
@@ -86,13 +88,16 @@ export const LibraryPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
                   <td><span className="muted num">第 {e.no} 期</span>　{e.title}</td>
                   <td className="num">{yuan(e.cost)}</td>
                   <td className="num muted">{e.doneAt ? ago(Date.parse(e.doneAt)) : "—"}</td>
-                  <td style={{ textAlign: "right" }}><button className="link" onClick={(ev) => { ev.stopPropagation(); reopen(e); }}>重新审片</button></td>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }} onClick={(ev) => ev.stopPropagation()}>
+                    {e.hd ? <a className="btn" href={`/api/video/${e.id}?hd=1&download=1`}>下载高清</a>
+                      : <button className="btn" disabled={exporting(e.id)} onClick={() => api(`episodes/${e.id}/export`, {}).then(() => toast("开始导出高清，约 5 分钟"))}>{exporting(e.id) ? "导出中…" : "导出高清"}</button>}
+                    　<button className="link" onClick={() => reopen(e)}>重新审片</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
           <div>{playing ? <video key={playing} src={`/api/video/${playing}`} controls autoPlay /> : <div className="empty card">点一行播放成片</div>}
-            {playing && <div className="small muted" style={{ marginTop: 8 }}>文件在 out/{playing}/{playing}.mp4</div>}</div>
+            {playing && <div className="small muted" style={{ marginTop: 8 }}>高清版 2160×1620，文件在 out/{playing}/{playing}-hd.mp4</div>}</div>
         </div>
       )}
     </>
@@ -100,11 +105,24 @@ export const LibraryPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
 };
 
 type Lib = {
+  mix: { bgm: number; sfx: Record<string, number> };
   voice: { speaker: string; rate: number }; voices: { name: string; speaker: string }[]; bgm: string | null; bgmFiles: string[];
   sfx: { kind: string; name: string; uses: number }[]; poses: string[]; props: string[]; components: [string, string][];
 };
 
-const play = (url: string) => { const a = new Audio(url); void a.play(); };
+const play = (url: string, volume = 1) => { const a = new Audio(url); a.volume = Math.min(1, volume); void a.play(); };
+
+/** 音量倍数：0～2 倍，松手保存 */
+const Volume: React.FC<{ value: number; onSave: (v: number) => void }> = ({ value, onSave }) => {
+  const [v, setV] = useState<number | null>(null);
+  const cur = v ?? value;
+  return (
+    <label className="small muted" style={{ marginRight: 16, whiteSpace: "nowrap" }}>音量{" "}
+      <input type="range" min={0} max={2} step={0.05} value={cur} onChange={(e) => setV(+e.target.value)}
+        onPointerUp={() => { if (v != null) { onSave(v); setV(null); } }} style={{ verticalAlign: "middle", width: 110 }} />{" "}
+      <span className="num">{cur.toFixed(2)}×</span></label>
+  );
+};
 
 export const AudioPage: React.FC<{ tab?: string }> = ({ tab = "voice" }) => {
   const { ask, toast } = useApp();
@@ -158,8 +176,9 @@ export const AudioPage: React.FC<{ tab?: string }> = ({ tab = "voice" }) => {
             {[null, ...lib.bgmFiles].map((f) => (
               <tr key={f ?? "builtin"}>
                 <td>{f ?? "木琴循环（程序合成，占位）"}　{lib.bgm === f && <span className="pill pos">当前使用</span>}</td>
-                <td style={{ textAlign: "right" }}>
-                  <button className="btn ghost" onClick={() => play(f ? `/assets/audio/bgm/${encodeURIComponent(f)}` : "/library/bgm_builtin.wav")}>试听</button>
+                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                  {lib.bgm === f && <Volume value={lib.mix.bgm} onSave={(v) => api("config", { mix: { bgm: v } }).then(() => { reload(); toast(`背景音乐音量 ${v.toFixed(2)}×，下次渲染生效`); })} />}
+                  <button className="btn ghost" onClick={() => play(f ? `/assets/audio/bgm/${encodeURIComponent(f)}` : "/library/bgm_builtin.wav", 0.5 * (lib.bgm === f ? lib.mix.bgm : 1))}>试听</button>
                   {lib.bgm !== f && <button className="btn ghost" onClick={() => api("config", { bgm: f }).then(() => { reload(); toast("下次渲染生效"); })}>设为当前</button>}
                 </td>
               </tr>
@@ -174,7 +193,9 @@ export const AudioPage: React.FC<{ tab?: string }> = ({ tab = "voice" }) => {
             {lib.sfx.map((s) => (
               <tr key={s.kind}>
                 <td>{s.name}　<span className="small muted">用在 {s.uses} 处</span></td>
-                <td style={{ textAlign: "right" }}><button className="btn ghost" onClick={() => play(`/library/sfx_${s.kind}.wav`)}>试听</button>
+                <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                  <Volume value={lib.mix.sfx[s.kind] ?? 1} onSave={(v) => api("config", { mix: { sfx: { [s.kind]: v } } }).then(() => { reload(); toast(`「${s.name}」音量 ${v.toFixed(2)}×，下次渲染生效`); })} />
+                  <button className="btn ghost" onClick={() => play(`/library/sfx_${s.kind}.wav`, 0.8 * (lib.mix.sfx[s.kind] ?? 1))}>试听</button>
                   <button className="btn ghost" onClick={() => ask(`「${s.name}」(${s.kind}) 这个音效我想换一下：`)}>让 AI 换</button></td>
               </tr>
             ))}
