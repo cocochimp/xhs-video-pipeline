@@ -93,3 +93,12 @@ def test_layout_rejects_unknown_roll_target():
     ep["roll"]["after"] = "nope"
     with pytest.raises(ValueError, match="nope"):
         layout(ep, fake_seg_audio(ep), VOICE)
+
+
+def test_char_times_recovers_after_unmatched_word():
+    words = [(0.0, 0.2, "二零二四"), (0.2, 0.4, "年"), (0.4, 0.6, "的"), (0.6, 0.8, "春"),
+             (0.8, 1.0, "天"), (1.0, 1.2, "来"), (1.2, 1.4, "了")]
+    st, en = char_times("2024年的春天来了", words)
+    assert st[4] == pytest.approx(0.2)
+    assert en[-1] == pytest.approx(1.4)
+    assert st == sorted(st)

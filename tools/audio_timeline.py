@@ -1,5 +1,6 @@
 """配音时间轴的纯计算部分：不读写文件、不联网，供 build_audio.py 使用。"""
 
+import difflib
 import hashlib
 import re
 
@@ -7,7 +8,6 @@ FPS = 30
 TAIL = 0.25        # 每段最后一个字之后留的余量（秒）
 END_PAD = 1.2      # 全片最后留白（秒）
 ROLL_LEAD = 0.05   # 选题滚动在前一段配音结束后多久开始（秒）
-MAX_SKIP = 3       # 逐字对齐时一个 TTS 字最多向后跳过几个朗读字，超过就当没对上
 
 
 def norm(s: str) -> str:
@@ -19,18 +19,17 @@ def char_times(speech: str, words) -> tuple[list[float], list[float]]:
     chars = norm(speech)
     st: list = [None] * len(chars)
     en: list = [None] * len(chars)
-    k = 0
+    tts_chars, tts_st, tts_en = [], [], []
     for s, e, w in words:
         w = norm(w)
-        if not w:
-            continue
-        pos = chars.find(w, k)
-        if pos < 0 or pos - k > MAX_SKIP:
-            continue
-        for i in range(len(w)):
-            st[pos + i] = s + (e - s) * i / len(w)
-            en[pos + i] = s + (e - s) * (i + 1) / len(w)
-        k = pos + len(w)
+        for i, c in enumerate(w):
+            tts_chars.append(c)
+            tts_st.append(s + (e - s) * i / len(w))
+            tts_en.append(s + (e - s) * (i + 1) / len(w))
+    sm = difflib.SequenceMatcher(None, chars, "".join(tts_chars), autojunk=False)
+    for i, j, n in sm.get_matching_blocks():
+        for d in range(n):
+            st[i + d], en[i + d] = tts_st[j + d], tts_en[j + d]
     last = 0.0
     for i in range(len(chars)):
         if st[i] is None:
