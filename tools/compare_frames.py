@@ -1,6 +1,7 @@
 """迁移校验：每个场景在旧版成片和新版成片里各取一帧（场景结束前 0.3 秒），并排对比。
 
-  .venv/bin/python tools/compare_frames.py episode/out/ep1.mp4 episode/public/timeline.json out/ep001/ep001.mp4 episodes/ep001
+  git show bc96c1b:episode/public/timeline.json > /tmp/old_timeline.json   # 旧时间轴（旧工程已删除，从 git 历史取）
+  .venv/bin/python tools/compare_frames.py out/legacy/ep1.mp4 /tmp/old_timeline.json out/ep001/ep001.mp4 episodes/ep001
 
 输出 out/ep001/compare.jpg；任一场景平均灰度差 > 14 时退出码为 1。
 旧时间轴的 subs 与新 episode.json 的台词一一对应（共 27 句），据此算出旧版各场景的结束时间。

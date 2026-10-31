@@ -141,7 +141,6 @@ def main():
     subprocess.run([ff, "-y", "-loglevel", "error", "-i", str(src), "-i", str(bgm_wav), "-i", str(sfx_wav),
                     "-filter_complex", graph, "-map", "0:v", "-map", "[out]",
                     "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ac", "2", "-t", f"{dur:.3f}", str(dst)], check=True)
-    print("→", dst)
 
 
 if __name__ == "__main__":
