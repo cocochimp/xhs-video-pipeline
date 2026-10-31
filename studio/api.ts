@@ -120,6 +120,7 @@ export function studioApi(root: string): Plugin {
       const scenes = e.scenes ?? [];
       return { id, no: e.no, title: e.title, stage: e.stage, cost: (e.cost?.tts ?? 0) + (e.cost?.image ?? 0), doneAt: e.doneAt,
         updated: fs.statSync(path.join(epDir(id), "episode.json")).mtimeMs, scenes: scenes.length,
+        duration: readJson(path.join(epDir(id), "audio/timeline.json"), {}).duration ?? null,
         video: fs.existsSync(P("out", id, `${id}.mp4`)), hd: fs.existsSync(P("out", id, `${id}-hd.mp4`)) };
     }),
     usage: usageSummary(),

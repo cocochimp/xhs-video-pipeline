@@ -44,15 +44,15 @@ export const App: React.FC = () => {
         <aside className="side">
           <div className="brand"><img src="/assets/avatar.jpg" alt="" /><div><b>阿牛要退休</b><span className="small muted">阿牛工作台</span></div></div>
           <div className="fire small muted">
-            <div style={{ display: "flex", justifyContent: "space-between" }}><span>FIRE 计划</span><span className="num">{done.length} / 100 期</span></div>
-            <div className="bar"><i style={{ width: `${done.length}%` }} /></div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}><span>FIRE 计划</span><span className="num">{eps.length} / 100 期</span></div>
+            <div className="bar"><i style={{ width: `${eps.length}%` }} /></div>
           </div>
           {NAV.map(([g, items]) => (
             <React.Fragment key={g}>
               <div className="group">{g}</div>
               {items.map(([k, n]) => (
                 <a key={k} href={`#${k}`} className={`nav ${(page === k || (page === "work" && k === (ep?.stage === "done" ? "done" : "todo"))) ? "on" : ""}`}>
-                  {n}{k === "todo" && todo.length > 0 && <span className="count num">{todo.length}</span>}
+                  {n}{k === "todo" && todo.length > 0 && <span className="count num">{todo.length}</span>}{k === "done" && done.length > 0 && <span className="count num">{done.length}</span>}
                 </a>
               ))}
             </React.Fragment>

@@ -75,29 +75,34 @@ export const LibraryPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
   const [jobs] = usePoll<{ ep?: string; kind: string; state: string; arg?: string }[]>("jobs", 3000);
   const exporting = (id: string) => jobs?.some((j) => j.ep === id && j.kind === "render" && j.arg === "hd" && (j.state === "queued" || j.state === "running"));
   const reopen = (e: Ep) => api(`episodes/${e.id}/reopen`, {}).then(() => { toast("已拉回审片台"); location.hash = `work/${e.id}/review`; });
+  const sorted = [...eps].sort((x, y) => y.no - x.no);
   return (
     <>
-      <Title>作品库</Title>
+      <Title>作品库 <span className="muted small num">{eps.length}</span></Title>
       {eps.length === 0 ? <div className="empty">还没有完结的作品。审片全部通过并渲染成片后，作品会出现在这里。</div> : (
-        <div className="grid cols-side">
-          <table>
-            <thead><tr><th>作品</th><th className="num">花费</th><th className="num">完结</th><th /></tr></thead>
-            <tbody>
-              {eps.map((e) => (
-                <tr key={e.id} className="click" onClick={() => setPlaying(e.id)}>
-                  <td><span className="muted num">第 {e.no} 期</span>　{e.title}</td>
-                  <td className="num">{yuan(e.cost)}</td>
-                  <td className="num muted">{e.doneAt ? ago(Date.parse(e.doneAt)) : "—"}</td>
-                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }} onClick={(ev) => ev.stopPropagation()}>
-                    {e.hd ? <a className="btn" href={`/api/video/${e.id}?hd=1&download=1`}>下载高清</a>
-                      : <button className="btn" disabled={exporting(e.id)} onClick={() => api(`episodes/${e.id}/export`, {}).then(() => toast("开始导出高清，约 5 分钟"))}>{exporting(e.id) ? "导出中…" : "导出高清"}</button>}
-                    　<button className="link" onClick={() => reopen(e)}>重新审片</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div>{playing ? <video key={playing} src={`/api/video/${playing}`} controls autoPlay /> : <div className="empty card">点一行播放成片</div>}
-            {playing && <div className="small muted" style={{ marginTop: 8 }}>高清版 2160×1620，文件在 out/{playing}/{playing}-hd.mp4</div>}</div>
+        <div className="works">
+          {sorted.map((e) => (
+            <article key={e.id} className="work">
+              <div className="cover">
+                {playing === e.id ? <video src={`/api/video/${e.id}`} controls autoPlay /> : (
+                  <button className="coverbtn" onClick={() => setPlaying(e.id)} aria-label={`播放第 ${e.no} 期`}>
+                    <img src={`/thumbs/${e.id}/s02.jpg?${e.updated}`} alt="" />
+                    <span className="playmark">▶</span>
+                  </button>
+                )}
+              </div>
+              <div className="meta">
+                <div className="small muted num">第 {e.no} 期</div>
+                <h2>{e.title}</h2>
+                <div className="small muted num">{e.duration ? `${Math.round(e.duration)} 秒` : "—"} · {yuan(e.cost)} · {e.doneAt ? ago(Date.parse(e.doneAt)) + "完结" : "已完结"}</div>
+                <div className="acts">
+                  {e.hd ? <a className="btn primary" href={`/api/video/${e.id}?hd=1&download=1`}>下载高清</a>
+                    : <button className="btn primary" disabled={exporting(e.id)} onClick={() => api(`episodes/${e.id}/export`, {}).then(() => toast("开始导出高清（2160×1620），约 5 分钟"))}>{exporting(e.id) ? "导出中…" : "导出高清"}</button>}
+                  <button className="btn" onClick={() => reopen(e)}>重新审片</button>
+                </div>
+              </div>
+            </article>
+          ))}
         </div>
       )}
     </>
