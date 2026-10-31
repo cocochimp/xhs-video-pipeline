@@ -4,16 +4,22 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p .",
-    "video:studio": "remotion studio shared/index.ts"
+    "video:studio": "remotion studio shared/index.ts",
+    "studio": "vite --config studio/vite.config.ts"
   },
   "dependencies": {
     "@remotion/cli": "4.0.539",
-    "remotion": "4.0.539",
+    "@remotion/player": "^4.0.539",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "remotion": "4.0.539"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "@types/react": "19.1.0",
-    "typescript": "5.8.3"
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "typescript": "5.8.3",
+    "vite": "^8.3.5"
   }
 }

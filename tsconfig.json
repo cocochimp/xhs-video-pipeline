@@ -8,7 +8,14 @@
     "resolveJsonModule": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    "types": [
+      "node"
+    ]
   },
-  "include": ["shared", "episodes"]
+  "include": [
+    "shared",
+    "episodes",
+    "studio"
+  ]
 }
