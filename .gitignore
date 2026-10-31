@@ -1,0 +1,15 @@
+# 依赖和缓存
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# 生成物（可重新生成，体积大）
+**/out/
+projects/*/frames/
+.superpowers/
+
+# 密钥只放在 ~/.config/xhs-video/.env，这里再兜底一次
+.env
+*.env

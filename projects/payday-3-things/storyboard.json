@@ -1,0 +1,23 @@
+{
+  "title": "工资到手先做这3件事",
+  "voice": "zh-CN-XiaoxiaoNeural",
+  "rate": "+8%",
+  "style": "手绘彩色马克笔漫画插画，纯白背景，粗黑色略带抖动的手绘轮廓线，Q版大头小身体比例，表情夸张生动，马克笔上色能看到笔触，配色克制：芥末黄、雾蓝、砖红、黑、浅灰、米色。主体居中，四周大量留白，道具简洁，没有复杂背景，不要渐变，不要写实光影，不要动漫赛璐璐风。",
+  "character": "主角「小柚」：年轻女生，黑色齐刘海波波头短发，圆脸，脸颊有淡淡腮红和几颗小雀斑，豆豆眼，穿芥末黄色连帽卫衣，深蓝色牛仔裤，白色帆布鞋。",
+  "shots": [
+    {"text": "工资到手的第一天，你是不是先打开了购物车？", "en": "On payday, is your shopping cart the first thing you open?", "keyword": "发工资啦", "scene": "小柚双手捧着手机，屏幕上是到账通知，眼睛放光，身边飘着几个购物袋和小星星"},
+    {"text": "先别急，有三件事比买买买重要得多。", "en": "Hold on. Three things matter far more than shopping.", "keyword": "先别急", "scene": "小柚伸出一只手掌做出停止的手势，另一只手按住一辆塞满东西的小购物车"},
+    {"text": "第一件事，先给自己发工资。", "en": "First: pay yourself first.", "keyword": "第一件事", "scene": "小柚把一个画着钱币符号的信封郑重地递给另一个一模一样的自己，两个人都在笑"},
+    {"text": "钱一到账，就把百分之二十转进一个平时不碰的账户。", "en": "The moment it lands, move 20% into an account you never touch.", "keyword": "先存20%", "scene": "小柚把一小沓钞票塞进一个带小锁的存钱罐，存钱罐上贴着一张写着20%的标签"},
+    {"text": "不是月底剩多少存多少，而是先存下来，剩下的才是能花的钱。", "en": "Don't save what's left. Spend what's left after saving.", "keyword": "顺序很重要", "scene": "上下两行对比的简笔流程图：上面一行钱袋箭头指向购物袋，最后只剩一枚小硬币；下面一行钱袋先箭头指向存钱罐，再箭头指向购物袋，小柚站在旁边用手指着下面一行"},
+    {"text": "第二件事，把固定支出先划出去。", "en": "Second: set aside your fixed costs.", "keyword": "第二件事", "scene": "小柚拿着一把大剪刀，把一张长长的账单纸条剪成几段"},
+    {"text": "房租、通勤、话费、还款，这些每个月都跑不掉。", "en": "Rent, commute, phone bill, loan payments. Every single month.", "keyword": "固定支出", "scene": "小柚掰着手指在数数，周围环绕着四个小图标：一栋小房子、一节地铁车厢、一部手机、一张信用卡"},
+    {"text": "提前留好，月中就不会突然发现钱不够用。", "en": "Set it aside early, and you won't run short mid-month.", "keyword": "不慌了", "scene": "小柚窝在沙发上安心地捧着一杯热茶，墙上挂着一本日历翻到15号"},
+    {"text": "第三件事，给想花的钱定一个上限。", "en": "Third: put a cap on your fun money.", "keyword": "第三件事", "scene": "小柚站在一个透明的大玻璃罐旁边，罐子侧面画着刻度线，里面装着一些硬币"},
+    {"text": "奶茶、外卖、衣服都可以买，但只在这个额度里花。", "en": "Bubble tea, takeout, clothes — all fine, but only within that cap.", "keyword": "有额度地花", "scene": "小柚从玻璃罐里取出一枚硬币，另一只手开心地举着一杯珍珠奶茶"},
+    {"text": "额度花完了就等下个月，这样花钱反而没有负罪感。", "en": "When it's gone, wait for next month. No more guilt.", "keyword": "不内疚", "scene": "小柚拿着空了的玻璃罐，表情淡定地耸耸肩，旁边一本小日历正在翻到下一页"},
+    {"text": "记住这个顺序：先存钱，再留固定支出，最后才是想花的钱。", "en": "Remember the order: save first, then fixed costs, then fun money.", "keyword": "记住顺序", "scene": "三级台阶从低到高，第一级上放着存钱罐，第二级放着小房子，第三级放着一杯奶茶，小柚站在最高处竖起大拇指"},
+    {"text": "坚持半年，你会发现攒钱其实没那么难。", "en": "Stick with it for six months, and saving gets easy.", "keyword": "半年后", "scene": "小柚开心地抱着一个变得很大很圆的存钱罐，身后有一条小小的向上增长的曲线"},
+    {"text": "你发工资后的第一件事是什么？评论区告诉我。", "en": "What's the first thing you do on payday? Tell me in the comments.", "keyword": "你呢？", "scene": "小柚面向观众笑着挥手，旁边有一个空白的对话气泡"}
+  ]
+}
