@@ -1,0 +1,28 @@
+from tools.sync_public import sync
+
+
+def _setup(root):
+    (root / "assets").mkdir()
+    (root / "assets" / "a.png").write_bytes(b"png")
+    (root / "assets" / "fonts").mkdir()   # 子目录不同步
+    audio = root / "episodes" / "ep001" / "audio"
+    audio.mkdir(parents=True)
+    (audio / "vo_body.mp3").write_bytes(b"mp3")
+    (audio / "timeline.json").write_text("{}")   # 只同步 mp3
+
+
+def test_sync_copies_then_skips_unchanged(tmp_path):
+    _setup(tmp_path)
+    assert sync(tmp_path) == 2
+    assert (tmp_path / "public/assets/a.png").read_bytes() == b"png"
+    assert (tmp_path / "public/episodes/ep001/audio/vo_body.mp3").read_bytes() == b"mp3"
+    assert not (tmp_path / "public/episodes/ep001/audio/timeline.json").exists()
+    assert sync(tmp_path) == 0
+
+
+def test_sync_recopies_changed_file(tmp_path):
+    _setup(tmp_path)
+    sync(tmp_path)
+    (tmp_path / "assets" / "a.png").write_bytes(b"png-v2")
+    assert sync(tmp_path) == 1
+    assert (tmp_path / "public/assets/a.png").read_bytes() == b"png-v2"
