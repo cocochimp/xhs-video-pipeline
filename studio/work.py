@@ -58,11 +58,12 @@ def cmd_text(ep_dir: Path, issue: str = "") -> dict:
         "你在给小红书账号「阿牛要退休」（系列：阿牛FIRE计划，主角是打工奶牛阿牛）写一期手绘解说短视频的文本。",
         task,
         "要求：8～10 个分镜（scenes），全片 60～90 秒；整期只讲一个核心数字，量化不要多；"
-        f"第一个分镜第一句固定为「阿牛FIRE计划第{before['no']}期，这一期聊：」(seg=open)，第二句是选题 (seg=title)；"
+        "固定开头：s01 两句，第一句「普通人，要如何才能【提前退休】？」(seg=hook)，"
+        f"第二句「这里是阿牛退休计划，第{before['no']}期」(seg=open)；s02 第一句「本期我们要讲的是：」(seg=open)，第二句是选题 (seg=title)；"
         "正文 seg=body；最后一句固定为「关注阿牛，一起早日退休！」(seg=end)。"
         "每句 lines 有 seg、zh（字幕，重点词用【】标橙）、say（朗读，数字写汉字）；每个分镜有 id(s01…)、name、visual（画面描述）、"
         "sfx（[{line, kind: pop|stamp|whoosh, vol}]）、status: pending、rounds: []。roll.topics 放 6 个别的选题。",
-        "只改 scenes、roll、title 字段，其他字段保持原样。参考第 1 期的写法：\n" + example,
+        "s01、s02 的 visual 和 sfx 照抄第 1 期。只改 scenes、roll、title 字段，其他字段保持原样。参考第 1 期的写法：\n" + example,
         '最后一行输出 {"summary": "<一句话说明>"}',
     ])
     saved, snap = capture(ROOT, ep_dir), snapshot(ROOT, ep_dir)

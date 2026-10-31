@@ -195,7 +195,7 @@ export function studioApi(root: string): Plugin {
               const no = Math.max(0, ...nos) + 1, id = `ep${String(no).padStart(3, "0")}`;
               fs.mkdirSync(epDir(id), { recursive: true });
               writeEp(id, { id, no, total: 100, stage: "text", title: data.title.trim(),
-                segments: [{ id: "open", gap: 0.3 }, { id: "title", gap: 1.4 }, { id: "body", gap: 0.5 }, { id: "end", gap: 0.6 }],
+                segments: [{ id: "hook", gap: 0.4 }, { id: "open", gap: 0.3 }, { id: "title", gap: 1.4 }, { id: "body", gap: 0.5 }, { id: "end", gap: 0.6 }],
                 scenes: [], cost: { tts: 0, image: 0 } });
               enqueue({ ep: id, kind: "text" });
               return send(200, { id });

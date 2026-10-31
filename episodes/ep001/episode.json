@@ -23,6 +23,10 @@
   },
   "segments": [
     {
+      "id": "hook",
+      "gap": 0.4
+    },
+    {
       "id": "open",
       "gap": 0.3
     },
@@ -42,25 +46,36 @@
   "scenes": [
     {
       "id": "s01",
-      "name": "开头举牌",
-      "visual": "阿牛举牌，牌上写「第1期」",
+      "name": "开头钩子+举牌",
+      "visual": "阿牛托腮发愁，「提前退休？」大字砸下；接着阿牛举牌，牌上写「第1期」",
       "lines": [
         {
+          "seg": "hook",
+          "zh": "普通人，要如何才能【提前退休】？",
+          "say": "普通人，要如何才能提前退休？"
+        },
+        {
           "seg": "open",
-          "zh": "阿牛FIRE计划，第1期",
-          "say": "阿牛Fire计划，第一期。"
+          "zh": "这里是阿牛退休计划，第1期",
+          "say": "这里是阿牛退休计划，第一期。"
         }
       ],
       "sfx": [
         {
           "line": 0,
+          "kind": "stamp",
+          "vol": 0.8
+        },
+        {
+          "line": 1,
           "kind": "pop",
           "vol": 0.8
         }
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": []
+      "rounds": [],
+      "updated": true
     },
     {
       "id": "s02",
@@ -69,8 +84,8 @@
       "lines": [
         {
           "seg": "open",
-          "zh": "这一期聊：",
-          "say": "这一期聊："
+          "zh": "本期我们要讲的是：",
+          "say": "本期我们要讲的是："
         },
         {
           "seg": "title",
@@ -81,7 +96,8 @@
       "sfx": [],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": []
+      "rounds": [],
+      "updated": true
     },
     {
       "id": "s03",
@@ -404,7 +420,7 @@
     }
   ],
   "cost": {
-    "tts": 0.0762,
+    "tts": 0.0873,
     "image": 0
   }
 }
