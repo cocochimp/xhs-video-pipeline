@@ -13,3 +13,6 @@ projects/*/frames/
 # 密钥只放在 ~/.config/xhs-video/.env，这里再兜底一次
 .env
 *.env
+
+# IDE
+.idea/
