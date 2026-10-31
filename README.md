@@ -40,3 +40,23 @@
 ## 成本
 
 Seedream 5.0 pro 每张 0.3–0.6 元。14 个镜头的 1 分钟视频约 5–9 元，配音和合成免费。
+
+## 分场景的期数结构（2026-10-31 起）
+
+```
+studio/config.json        全局配音音色和语速
+assets/                   阿牛姿势、道具、头像（aniu/make_assets.py 直接生成到这里）
+shared/                   公共组件和 Remotion 入口（shared/index.ts）
+episodes/ep001/
+  episode.json            本期数据：台词（zh 字幕 / say 朗读）、画面大意、音效、状态
+  scenes/s01.tsx …        每个场景一个文件，只用相对时间 at(i)
+  audio/                  配音和时间轴（tools/build_audio.py 生成）
+out/ep001/                成片（不进 git）
+```
+
+```bash
+.venv/bin/python tools/build_audio.py episodes/ep001    # 只重配台词变了的段
+.venv/bin/python tools/render.py episodes/ep001         # → out/ep001/ep001.mp4
+npm run video:studio                                    # 在 Remotion Studio 里预览
+.venv/bin/python -m pytest tests -q                     # 单元测试
+```
