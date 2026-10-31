@@ -131,7 +131,7 @@ def main():
     graph = (
         "[0:a]aresample=44100,pan=mono|c0=0.5*c0+0.5*c1,"
         "acompressor=threshold=-20dB:ratio=3:attack=5:release=80:makeup=4,"
-        "loudnorm=I=-15:TP=-1.5:LRA=7,asplit=2[voice][key];"
+        "loudnorm=I=-15:TP=-1.5:LRA=7,apad,asplit=2[voice][key];"
         "[1:a]loudnorm=I=-22:TP=-3:LRA=11,volume=0.8[bgm];"
         "[bgm][key]sidechaincompress=threshold=0.05:ratio=3:attack=20:release=250[ducked];"
         "[2:a]volume=0.9[fx];"
