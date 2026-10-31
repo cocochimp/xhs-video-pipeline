@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT.parent / "opening"))
 import pipeline as P  # noqa: E402
 from make_assets import components, cutout, grid  # noqa: E402  复用抠图/切分
 
-RAW, PUB = ROOT / "raw", ROOT / "public"
+RAW, PUB = ROOT / "raw", ROOT.parent / "assets"
 CONCEPT = ROOT.parent / "ip/concepts/A-奶牛打工人.jpg"
 SHEET = RAW / "character.jpg"
 
