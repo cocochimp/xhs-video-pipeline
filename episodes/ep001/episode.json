@@ -469,15 +469,15 @@
         }
       ],
       "textStatus": "approved",
-      "status": "pending",
+      "status": "approved",
       "rounds": [],
-      "updated": true,
+      "updated": false,
       "voiceUpdated": false,
       "costWarn": false
     }
   ],
   "cost": {
-    "tts": 0.1887,
+    "tts": 0.2694,
     "image": 0.12
   }
 }

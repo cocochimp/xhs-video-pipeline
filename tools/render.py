@@ -40,7 +40,14 @@ def render(ep_dir: Path, draft: bool = False, hd: bool = False) -> Path:
     episode = json.loads((ep_dir / "episode.json").read_text())
     timeline = json.loads((ep_dir / "audio/timeline.json").read_text())
     voice = json.loads((ROOT / "studio/config.json").read_text())["voice"]
-    check_timeline(episode, timeline, voice, ep_dir.name)
+    try:
+        check_timeline(episode, timeline, voice, ep_dir.name)
+    except RuntimeError:  # 台词或音色改过：只重配变了的段（有缓存的不花钱），再渲染
+        from tools.build_audio import build
+        timeline, billed, _ = build(ep_dir)
+        print(f"  重新配音 {billed} 字（约 {billed * 0.0003:.2f} 元）", file=sys.stderr)
+        episode = json.loads((ep_dir / "episode.json").read_text())
+        check_timeline(episode, timeline, voice, ep_dir.name)
     eid = episode["id"]
     out = ROOT / "out" / eid
     out.mkdir(parents=True, exist_ok=True)
