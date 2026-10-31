@@ -11,7 +11,7 @@ const S10: React.FC<SceneProps> = ({ at }) => {
   return (
     <AbsoluteFill>
       {ask ? (
-        <Pose name="sign" x={720} h={760} at={Math.max(0, at(0) - 4)} sign={<span>你的数字<span style={{ color: ORANGE }}>是？</span></span>} />
+        <Pose name="sign" x={720} h={760} at={at(0) - 4} sign={<span>你的数字<span style={{ color: ORANGE }}>是？</span></span>} />
       ) : (
         <>
           <Pose name="wave" x={420} h={680} at={at(2)} />
