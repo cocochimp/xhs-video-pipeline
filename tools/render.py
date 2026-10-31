@@ -13,11 +13,33 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from tools.audio_timeline import segment_hash, segment_speech  # noqa: E402
 from tools.sync_public import sync  # noqa: E402
 
 
+def check_timeline(episode: dict, timeline: dict, voice: dict, dir_name: str) -> None:
+    """时间轴必须和当前 episode.json、音色一致，否则渲染出来的字幕和配音会对不上。"""
+    if episode["id"] != dir_name:
+        raise RuntimeError(f"episode.json 的 id（{episode['id']}）与目录名（{dir_name}）不一致")
+    stale = []
+    for seg, text in segment_speech(episode).items():
+        have = timeline.get("segments", {}).get(seg, {}).get("hash")
+        if have != segment_hash(voice["speaker"], voice["rate"], text):
+            stale.append(f"配音段 {seg}")
+    want = [(sc["id"], i, ln["zh"]) for sc in episode["scenes"] for i, ln in enumerate(sc["lines"])]
+    got = [(ln["scene"], ln["i"], ln["zh"]) for ln in timeline.get("lines", [])]
+    if want != got:
+        stale.append("台词/字幕")
+    if stale:
+        raise RuntimeError(f"timeline.json 已过期（{'、'.join(stale)}与 episode.json 不一致），先运行 tools/build_audio.py")
+
+
 def render(ep_dir: Path, draft: bool = False) -> Path:
-    eid = json.loads((ep_dir / "episode.json").read_text())["id"]
+    episode = json.loads((ep_dir / "episode.json").read_text())
+    timeline = json.loads((ep_dir / "audio/timeline.json").read_text())
+    voice = json.loads((ROOT / "studio/config.json").read_text())["voice"]
+    check_timeline(episode, timeline, voice, ep_dir.name)
+    eid = episode["id"]
     out = ROOT / "out" / eid
     out.mkdir(parents=True, exist_ok=True)
     sync(ROOT)
