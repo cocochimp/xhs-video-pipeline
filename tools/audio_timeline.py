@@ -7,10 +7,11 @@ FPS = 30
 TAIL = 0.25        # 每段最后一个字之后留的余量（秒）
 END_PAD = 1.2      # 全片最后留白（秒）
 ROLL_LEAD = 0.05   # 选题滚动在前一段配音结束后多久开始（秒）
+MAX_SKIP = 3       # 逐字对齐时一个 TTS 字最多向后跳过几个朗读字，超过就当没对上
 
 
 def norm(s: str) -> str:
-    return re.sub(r"[\W_]+", "", s)
+    return re.sub(r"[\W_]+", "", s).lower()
 
 
 def char_times(speech: str, words) -> tuple[list[float], list[float]]:
@@ -24,7 +25,7 @@ def char_times(speech: str, words) -> tuple[list[float], list[float]]:
         if not w:
             continue
         pos = chars.find(w, k)
-        if pos < 0:
+        if pos < 0 or pos - k > MAX_SKIP:
             continue
         for i in range(len(w)):
             st[pos + i] = s + (e - s) * i / len(w)
@@ -92,6 +93,8 @@ def layout(episode: dict, seg_audio: dict, voice: dict) -> dict:
     speech = segment_speech(episode)
     gaps = {s["id"]: s["gap"] for s in episode["segments"]}
     roll_cfg = episode.get("roll")
+    if roll_cfg and roll_cfg["after"] not in speech:
+        raise ValueError(f"选题滚动的目标配音段不存在：{roll_cfg['after']}")
     t0, segs, tables, roll = 0.0, {}, {}, None
     for seg, text in speech.items():
         t0 += gaps[seg]

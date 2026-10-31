@@ -66,3 +66,30 @@ def test_sfx_expansion_includes_roll_ticks():
 def test_segment_hash_changes_with_rate():
     assert segment_hash("x", 15, "文本") != segment_hash("x", 16, "文本")
     assert segment_hash("x", 15, "文本") == segment_hash("x", 15, "文本")
+
+
+def test_char_times_limits_skip_ahead():
+    words = [(0.0, 0.1, "十"), (0.1, 0.2, "个"), (0.2, 0.3, "人"),
+             (0.3, 0.4, "十"), (0.4, 0.5, "分"), (0.5, 0.6, "好")]
+    st, en = char_times("10个人，十分好", words)
+    chars = "10个人十分好"
+    assert st[chars.index("个")] == pytest.approx(0.1)
+    assert st == sorted(st)
+
+
+def test_char_times_splits_multichar_word_evenly():
+    st, en = char_times("一二三", [(0, 0.4, "一二")])
+    assert st[:2] == pytest.approx([0, 0.2])
+    assert en[:2] == pytest.approx([0.2, 0.4])
+
+
+def test_char_times_is_case_insensitive():
+    st, en = char_times("Hello", [(0, 0.5, "hello")])
+    assert en[-1] == pytest.approx(0.5)
+
+
+def test_layout_rejects_unknown_roll_target():
+    ep = make_episode()
+    ep["roll"]["after"] = "nope"
+    with pytest.raises(ValueError, match="nope"):
+        layout(ep, fake_seg_audio(ep), VOICE)

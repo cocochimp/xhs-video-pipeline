@@ -33,26 +33,33 @@ def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = No
     episode = json.loads((ep_dir / "episode.json").read_text())
     audio = ep_dir / "audio"
     audio.mkdir(exist_ok=True)
+    speech = segment_speech(episode)
+    # 先用假音频走一遍排版，音效越界、空台词等错误在计费前暴露
+    layout(episode, {seg: {"duration": 1.0, "words": [], "hash": ""} for seg in speech}, voice)
     seg_audio, billed = {}, 0
-    for seg, text in segment_speech(episode).items():
-        key = segment_hash(voice["speaker"], voice["rate"], text)
-        wfile, mp3 = audio / f"words_{seg}.json", audio / f"vo_{seg}.mp3"
-        cached = json.loads(wfile.read_text()) if wfile.exists() and mp3.exists() else None
-        if force or not cached or cached["hash"] != key:
-            words = synth(text, mp3, speaker=voice["speaker"], speech_rate=voice["rate"])
-            if not words:
-                raise RuntimeError(f"配音段 {seg} 没有返回逐字时间")
-            cached = {"hash": key, "words": [list(w) for w in words]}
-            wfile.write_text(json.dumps(cached, ensure_ascii=False))
-            billed += len(text)
-            print(f"  配音 {seg}：{len(text)} 字")
-        words = [tuple(w) for w in cached["words"]]
-        seg_audio[seg] = {"duration": words[-1][1] + TAIL, "words": words, "hash": key}
-    tl = layout(episode, seg_audio, voice)
-    (audio / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1))
-    if billed:
-        episode["cost"]["tts"] = round(episode["cost"]["tts"] + billed * PRICE, 4)
-        (ep_dir / "episode.json").write_text(json.dumps(episode, ensure_ascii=False, indent=2) + "\n")
+    try:
+        for seg, text in speech.items():
+            key = segment_hash(voice["speaker"], voice["rate"], text)
+            wfile, mp3 = audio / f"words_{seg}.json", audio / f"vo_{seg}.mp3"
+            cached = json.loads(wfile.read_text()) if wfile.exists() and mp3.exists() else None
+            if force or not cached or cached["hash"] != key:
+                wfile.unlink(missing_ok=True)  # 合成失败时不能留下与新 mp3 不配套的旧缓存
+                words = synth(text, mp3, speaker=voice["speaker"], speech_rate=voice["rate"])
+                if not words:
+                    raise RuntimeError(f"配音段 {seg} 没有返回逐字时间")
+                cached = {"hash": key, "words": [list(w) for w in words]}
+                wfile.write_text(json.dumps(cached, ensure_ascii=False))
+                billed += len(text)
+                print(f"  配音 {seg}：{len(text)} 字")
+            words = [tuple(w) for w in cached["words"]]
+            seg_audio[seg] = {"duration": words[-1][1] + TAIL, "words": words, "hash": key}
+        tl = layout(episode, seg_audio, voice)
+        (audio / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1))
+    finally:
+        if billed:
+            tts = episode.setdefault("cost", {}).setdefault("tts", 0)
+            episode["cost"]["tts"] = round(tts + billed * PRICE, 4)
+            (ep_dir / "episode.json").write_text(json.dumps(episode, ensure_ascii=False, indent=2) + "\n")
     if sync_root:
         sync(sync_root)
     return tl, billed

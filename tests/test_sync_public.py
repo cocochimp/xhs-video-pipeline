@@ -26,3 +26,15 @@ def test_sync_recopies_changed_file(tmp_path):
     (tmp_path / "assets" / "a.png").write_bytes(b"png-v2")
     assert sync(tmp_path) == 1
     assert (tmp_path / "public/assets/a.png").read_bytes() == b"png-v2"
+
+
+def test_sync_recopies_same_size_file_with_older_mtime(tmp_path):
+    import os
+    _setup(tmp_path)
+    sync(tmp_path)
+    src = tmp_path / "assets" / "a.png"
+    src.write_bytes(b"pnx")
+    old = (tmp_path / "public/assets/a.png").stat().st_mtime - 100
+    os.utime(src, (old, old))
+    assert sync(tmp_path) == 1
+    assert (tmp_path / "public/assets/a.png").read_bytes() == b"pnx"
