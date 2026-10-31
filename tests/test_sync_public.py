@@ -38,3 +38,12 @@ def test_sync_recopies_same_size_file_with_older_mtime(tmp_path):
     os.utime(src, (old, old))
     assert sync(tmp_path) == 1
     assert (tmp_path / "public/assets/a.png").read_bytes() == b"pnx"
+
+
+def test_sync_skips_hidden_files(tmp_path):
+    _setup(tmp_path)
+    (tmp_path / "assets" / ".DS_Store").write_bytes(b"x")
+    (tmp_path / "episodes/ep001/audio/.hidden.mp3").write_bytes(b"x")
+    assert sync(tmp_path) == 2
+    assert not (tmp_path / "public/assets/.DS_Store").exists()
+    assert not (tmp_path / "public/episodes/ep001/audio/.hidden.mp3").exists()

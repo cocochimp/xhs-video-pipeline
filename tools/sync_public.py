@@ -18,10 +18,10 @@ def _copy_if_changed(src: Path, dst: Path) -> bool:
 def sync(root: Path) -> int:
     pub, n = root / "public", 0
     for f in sorted((root / "assets").glob("*")):
-        if f.is_file():
+        if f.is_file() and not f.name.startswith("."):
             n += _copy_if_changed(f, pub / "assets" / f.name)
     for ep in sorted(p for p in (root / "episodes").glob("ep*") if p.is_dir()):
-        for f in sorted((ep / "audio").glob("*.mp3")):
+        for f in sorted(p for p in (ep / "audio").glob("*.mp3") if not p.name.startswith(".")):
             n += _copy_if_changed(f, pub / "episodes" / ep.name / "audio" / f.name)
     return n
 
