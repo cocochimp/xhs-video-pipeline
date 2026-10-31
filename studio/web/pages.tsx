@@ -167,14 +167,13 @@ export const AudioPage: React.FC<{ tab?: string }> = ({ tab = "voice" }) => {
           </tbody>
         </table>
       )}
-      {(tab === "bgm" || tab === "sfx") && <FreeSources tab={tab} />}
       {tab === "sfx" && (
         <table>
-          <thead><tr><th>音效</th><th>代号</th><th className="num">用在几处</th><th /></tr></thead>
+          <thead><tr><th>音效</th><th /></tr></thead>
           <tbody>
             {lib.sfx.map((s) => (
               <tr key={s.kind}>
-                <td>{s.name}</td><td className="mono small muted">{s.kind}</td><td className="num">{s.uses}</td>
+                <td>{s.name}　<span className="small muted">用在 {s.uses} 处</span></td>
                 <td style={{ textAlign: "right" }}><button className="btn ghost" onClick={() => play(`/library/sfx_${s.kind}.wav`)}>试听</button>
                   <button className="btn ghost" onClick={() => ask(`「${s.name}」(${s.kind}) 这个音效我想换一下：`)}>让 AI 换</button></td>
               </tr>
@@ -182,6 +181,7 @@ export const AudioPage: React.FC<{ tab?: string }> = ({ tab = "voice" }) => {
           </tbody>
         </table>
       )}
+      {(tab === "bgm" || tab === "sfx") && <FreeSources tab={tab} />}
     </>
   );
 };
