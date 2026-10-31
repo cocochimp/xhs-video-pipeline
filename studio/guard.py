@@ -15,7 +15,9 @@ def _files(root: Path, ep_dir: Path) -> list[Path]:
         files += [p for p in d.rglob("*") if p.is_file()]
     files += [p for p in ep_dir.rglob("*") if p.is_file()
               and not {"audio", "history", "thumbs"} & set(p.relative_to(ep_dir).parts)]
-    return [p for p in files if p.exists() and not p.name.startswith(".")]
+    for d in ("tools", "opening", "aniu", "studio", "shared"):  # 代码也不许 AI 改
+        files += [p for p in (root / d).rglob("*") if p.suffix in (".py", ".ts", ".tsx", ".md", ".css", ".html") and ".venv" not in p.parts]
+    return sorted({p for p in files if p.exists() and not p.name.startswith(".")})
 
 
 def capture(root: Path, ep_dir: Path) -> dict[str, bytes]:

@@ -81,8 +81,17 @@
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": [],
-      "updated": true
+      "rounds": [
+        {
+          "n": 1,
+          "issue": "第一张贴图的右耳朵好像被截断了，优化",
+          "summary": "❌ 检查失败（网站 bug：备份文件被拿去做类型检查，已修复）。右耳被切的原因是姿势图切分，已从素材层面修好",
+          "cost": 0.12,
+          "at": "2026-10-31T20:00:56"
+        }
+      ],
+      "updated": true,
+      "costWarn": false
     },
     {
       "id": "s02",
@@ -97,7 +106,7 @@
         {
           "seg": "title",
           "zh": "月薪8千，想退休到底要攒多少钱？",
-          "say": "月薪八千，想退休，到底要攒多少钱？"
+          "say": "月薪八千想退休到底要攒多少钱？"
         }
       ],
       "sfx": [
@@ -109,8 +118,17 @@
       ],
       "textStatus": "approved",
       "status": "pending",
-      "rounds": [],
-      "updated": true
+      "rounds": [
+        {
+          "n": 1,
+          "issue": "1、为什么在说：月薪8千，想退休到底要攒多少钱？这句话的时候语速明显变慢了，语速要跟整个视频同轨；\n2、滚动的时候没有音效，通过音效库分享的网站里面获取适配的音效进行配置",
+          "summary": "把 s02 标题句的朗读文本去掉两个逗号，消除停顿让语速和全片一致；滚动音效已自动存在但声音太弱，换成网站素材要改 opening/make_audio.py 并新增音频文件，超出本片范围，这次没改",
+          "cost": 0.0045,
+          "at": "2026-10-31T20:02:47"
+        }
+      ],
+      "updated": true,
+      "costWarn": false
     },
     {
       "id": "s03",
@@ -269,7 +287,7 @@
         {
           "line": 2,
           "kind": "stamp",
-          "vol": 1.0
+          "vol": 1
         }
       ],
       "textStatus": "approved",
@@ -433,7 +451,7 @@
     }
   ],
   "cost": {
-    "tts": 0.1842,
-    "image": 0
+    "tts": 0.1887,
+    "image": 0.12
   }
 }

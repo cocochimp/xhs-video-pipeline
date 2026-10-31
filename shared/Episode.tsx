@@ -6,7 +6,8 @@ import { f, FPS } from "./theme";
 import type { EpisodeModule } from "./types";
 
 /** 每个场景放进自己的 <Sequence>，场景里 useCurrentFrame() 从 0 开始 */
-export const Episode: React.FC<{ ep: EpisodeModule }> = ({ ep }) => {
+/** preview：网站预览时把音效和背景音乐也放进来（渲染成片时由 opening/make_audio.py 另行混音，不传） */
+export const Episode: React.FC<{ ep: EpisodeModule; preview?: { bgm: string } }> = ({ ep, preview }) => {
   const { episode, timeline, scenes } = ep;
   if (timeline.fps !== FPS) throw new Error(`timeline.json 帧率 ${timeline.fps} 与 FPS ${FPS} 不一致`);
   return (
@@ -38,6 +39,12 @@ export const Episode: React.FC<{ ep: EpisodeModule }> = ({ ep }) => {
             <Audio src={staticFile(`episodes/${episode.id}/audio/vo_${id}_${s.hash}.mp3`)} />
           </Sequence>
         ))}
+        {preview && timeline.sfx.map(([t, kind, vol], k) => (
+          <Sequence key={`fx${k}`} from={f(t)} durationInFrames={f(1.2)} name={`音效 ${kind}`}>
+            <Audio src={staticFile(`library/sfx_${kind}.wav`)} volume={Math.min(1, vol * 0.8)} />
+          </Sequence>
+        ))}
+        {preview && <Audio src={preview.bgm} loop volume={0.12} />}
       </AbsoluteFill>
     </EpisodeCtx.Provider>
   );

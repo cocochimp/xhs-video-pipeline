@@ -9,7 +9,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT.parent))
@@ -101,11 +101,58 @@ def largest_blob(cell: Image.Image) -> Image.Image:
     return Image.composite(cell, Image.new("RGB", cell.size, "white"), m)
 
 
+def poses_by_blob(img: Image.Image, n: int) -> list[Image.Image]:
+    """按连通的图形切出 n 个姿势：每个姿势取一块完整的外接框，耳朵、牌子不会被竖线切断；
+    小碎片归到离它最近的姿势。"""
+    s = 4
+    g = img.convert("L").resize((img.width // s, img.height // s))
+    w, h = g.size
+    ink = [[g.getpixel((x, y)) < 230 for x in range(w)] for y in range(h)]
+    seen, comps = [[False] * w for _ in range(h)], []
+    for y0 in range(h):
+        for x0 in range(w):
+            if not ink[y0][x0] or seen[y0][x0]:
+                continue
+            stack, comp = [(x0, y0)], []
+            seen[y0][x0] = True
+            while stack:
+                x, y = stack.pop()
+                comp.append((x, y))
+                for dx in range(-2, 3):
+                    for dy in range(-2, 3):
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < w and 0 <= ny < h and ink[ny][nx] and not seen[ny][nx]:
+                            seen[ny][nx] = True
+                            stack.append((nx, ny))
+            comps.append(comp)
+    comps.sort(key=len, reverse=True)
+    main = sorted(comps[:n], key=lambda c: min(x for x, _ in c))
+    boxes = [[min(x for x, _ in c), min(y for _, y in c), max(x for x, _ in c), max(y for _, y in c)] for c in main]
+    masks = [Image.new("L", (w, h), 0) for _ in main]
+    for k, c in enumerate(main):
+        for x, y in c:
+            masks[k].putpixel((x, y), 255)
+    for c in comps[n:]:
+        if len(c) < 4:
+            continue
+        cx = sum(x for x, _ in c) / len(c)
+        k = min(range(len(main)), key=lambda i: abs(cx - (boxes[i][0] + boxes[i][2]) / 2))
+        for x, y in c:
+            masks[k].putpixel((x, y), 255)
+    out = []
+    for m in masks:
+        m = m.filter(ImageFilter.MaxFilter(5)).resize(img.size)
+        part = Image.composite(img, Image.new("RGB", img.size, "white"), m)
+        x0, y0, x1, y1 = m.getbbox()
+        out.append(part.crop((max(0, x0 - 16), max(0, y0 - 16), min(img.width, x1 + 16), min(img.height, y1 + 16))))
+    return out
+
+
 def split(name: str, raw: Path):
     img = Image.open(raw).convert("RGB")
     if name in POSES:
-        for label, part in zip(POSES[name][0], components(img, 3)):
-            cutout(largest_blob(part)).save(PUB / f"pose_{label}.png")  # 去掉相邻姿势伸进来的手和牌子
+        for label, part in zip(POSES[name][0], poses_by_blob(img, 3)):
+            cutout(part).save(PUB / f"pose_{label}.png")
     elif name in SINGLE:
         cutout(largest_blob(img)).save(PUB / f"{name}.png")
     elif name == "props":

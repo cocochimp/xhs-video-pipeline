@@ -1,5 +1,5 @@
-import { Player } from "@remotion/player";
-import React, { useMemo, useState } from "react";
+import { Player, type PlayerRef } from "@remotion/player";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { EPISODES } from "../../episodes";
 import { Episode } from "../../shared/Episode";
 import { FPS, f } from "../../shared/theme";
@@ -123,6 +123,8 @@ const GenStep: React.FC<{ ep: Ep; job?: Job }> = ({ ep, job }) => {
 
 const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) => {
   const mod = EPISODES.find((m) => m.episode.id === ep.id);
+  const [lib] = usePoll<{ bgm: string | null }>("library", 30000);
+  const bgm = lib?.bgm ? `/assets/audio/bgm/${encodeURIComponent(lib.bgm)}` : "/library/bgm_builtin.wav";
   const [sel, setSel] = useState("all");
   const [issue, setIssue] = useState("");
   if (!mod) return <div className="empty">这一期的分镜代码还没注册。到「生成」里重试一次。</div>;
@@ -171,7 +173,7 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
         </div>
 
         <div>
-          <Preview mod={mod} start={whole ? 0 : Math.max(0, span.start - 0.5)} end={whole ? dur : Math.min(dur, span.end + 0.5)} />
+          <Preview mod={mod} start={whole ? 0 : Math.max(0, span.start - 0.5)} end={whole ? dur : Math.min(dur, span.end + 0.5)} bgm={bgm} />
           <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "8px 0 var(--gap)" }}>
             <span className="small muted">{whole ? "完整视频" : `${sc.id} ${sc.name}，前后各多放 0.5 秒`}</span>
             <span className="sp" />
@@ -213,12 +215,29 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
   );
 };
 
-const Preview: React.FC<{ mod: EpisodeModule; start: number; end: number }> = ({ mod, start, end }) => {
-  const C = useMemo(() => () => <Episode ep={mod} />, [mod]);
+/** 一个播放器，选片时跳到这一片开头播一次，到结尾自动停 */
+const Preview: React.FC<{ mod: EpisodeModule; start: number; end: number; bgm: string }> = ({ mod, start, end, bgm }) => {
+  const ref = useRef<PlayerRef>(null);
+  const C = useMemo(() => () => <Episode ep={mod} preview={{ bgm }} />, [mod, bgm]);
+  const s = f(start), e = Math.max(f(start) + 1, f(end) - 1);
+  useEffect(() => {
+    const p = ref.current;
+    if (!p) return;
+    p.pause();
+    p.seekTo(s);
+    p.play();
+    let prev = s;
+    const stop = ({ detail }: { detail: { frame: number } }) => { // 播过这一片结尾才停；手动拖到后面不拦
+      if (prev < e && detail.frame >= e && p.isPlaying()) p.pause();
+      prev = detail.frame;
+    };
+    p.addEventListener("frameupdate", stop);
+    return () => p.removeEventListener("frameupdate", stop);
+  }, [s, e]);
   return (
     <div className="player" data-ui>
-      <Player component={C} durationInFrames={f(mod.timeline.duration)} fps={FPS} compositionWidth={1440} compositionHeight={1080}
-        style={{ width: "100%" }} controls autoPlay inFrame={f(start)} outFrame={Math.max(f(start) + 1, f(end) - 1)} key={`${start}-${end}`} />
+      <Player ref={ref} component={C} durationInFrames={f(mod.timeline.duration)} fps={FPS} compositionWidth={1440} compositionHeight={1080}
+        style={{ width: "100%" }} controls />
     </div>
   );
 };
