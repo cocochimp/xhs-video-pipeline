@@ -57,14 +57,16 @@ def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = No
     # 先用假音频走一遍排版，音效越界、空台词等错误在计费前暴露
     layout(episode, {seg: {"duration": 1.0, "words": [], "hash": ""} for seg in speech}, voice)
     seg_audio, billed, revoiced = {}, 0, []
+    rates = {s["id"]: s["rate"] for s in episode["segments"] if "rate" in s}  # 某段单独调语速（如开头）
     try:
         for seg, text in speech.items():
-            key = segment_hash(voice["speaker"], voice["rate"], text)
+            rate = rates.get(seg, voice["rate"])
+            key = segment_hash(voice["speaker"], rate, text)
             wfile, mp3 = audio / f"words_{seg}_{key}.json", audio / f"vo_{seg}_{key}.mp3"
             cached = json.loads(wfile.read_text()) if wfile.exists() and mp3.exists() else None
             if force or not cached or cached["hash"] != key:
                 wfile.unlink(missing_ok=True)  # 合成失败时不能留下与新 mp3 不配套的旧缓存
-                words = synth(text, mp3, speaker=voice["speaker"], speech_rate=voice["rate"])
+                words = synth(text, mp3, speaker=voice["speaker"], speech_rate=rate)
                 if not words:
                     raise RuntimeError(f"配音段 {seg} 没有返回逐字时间")
                 cached = {"hash": key, "words": [list(w) for w in words]}

@@ -96,7 +96,22 @@ def sfx_whoosh() -> np.ndarray:
     return out * env * 2.2
 
 
-SFX = {"pop": sfx_pop, "stamp": sfx_stamp, "whoosh": sfx_whoosh}
+def sfx_tick() -> np.ndarray:
+    """老虎机滚过一格：短促的木质咔哒"""
+    n = int(SR * 0.05)
+    t = np.arange(n) / SR
+    click = np.random.default_rng(3).uniform(-1, 1, n) * np.exp(-t / 0.004)
+    return (click * 0.6 + np.sin(2 * np.pi * 1800 * t) * np.exp(-t / 0.012) * 0.5)
+
+
+def sfx_ding() -> np.ndarray:
+    """停在本期选题：清脆的叮"""
+    n = int(SR * 0.9)
+    t = np.arange(n) / SR
+    return sum(a * np.sin(2 * np.pi * fr * t) for fr, a in ((1318.5, 0.6), (2637, 0.25), (1975.5, 0.15))) * np.exp(-t / 0.25)
+
+
+SFX = {"pop": sfx_pop, "stamp": sfx_stamp, "whoosh": sfx_whoosh, "tick": sfx_tick, "ding": sfx_ding}
 
 
 def build_tracks(duration: float, tl: dict, tmp: Path) -> tuple[Path, Path]:

@@ -76,7 +76,7 @@ def segment_hash(speaker: str, rate: int, speech: str) -> str:
 
 
 def expand_sfx(episode: dict, lines: list[dict], roll: dict | None) -> list[list]:
-    """场景里按台词序号写的音效 → [[绝对秒, 种类, 音量], ...]，加上选题滚动的嘀嗒声，按时间排序。"""
+    """场景里按台词序号写的音效 → [[绝对秒, 种类, 音量], ...]，加上选题滚动的咔哒声和停下时的叮，按时间排序。"""
     starts: dict[str, list[float]] = {}
     for ln in lines:
         starts.setdefault(ln["scene"], []).append(ln["start"])
@@ -92,7 +92,7 @@ def expand_sfx(episode: dict, lines: list[dict], roll: dict | None) -> list[list
         for j in range(1, n):
             p = 1 - (1 - j / (n - 1)) ** (1 / 3)   # 与画面同一条缓动曲线的反函数
             final = j == n - 1
-            out.append([round(roll["start"] + roll["dur"] * p, 3), "stamp" if final else "pop", 0.8 if final else 0.35])
+            out.append([round(roll["start"] + roll["dur"] * p, 3), "ding" if final else "tick", 0.9 if final else 0.7])
     return sorted(out)
 
 

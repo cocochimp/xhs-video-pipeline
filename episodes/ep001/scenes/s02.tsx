@@ -5,7 +5,7 @@ import { FONT, INK, ORANGE, f } from "../../../shared/theme";
 import type { SceneProps } from "../../../shared/types";
 import { Pose, pop } from "../../../shared/ui";
 
-/** 固定开头：选题像老虎机一样滚动，先快后慢，停在本期选题 */
+/** 固定开头：选题像老虎机转轮一样滚动，先快后慢，停在本期选题；转轮首尾相接，停下后下面还露着别的选题 */
 const S02: React.FC<SceneProps> = ({ from }) => {
   const frame = useCurrentFrame();
   const { timeline } = useEp();
@@ -22,12 +22,13 @@ const S02: React.FC<SceneProps> = ({ from }) => {
   return (
     <AbsoluteFill>
       <Pose name="point" x={250} h={600} at={0} />
+      {/* 本期选题之后接上开头几张，像转轮一样首尾相接 */}
       <div style={{ position: "absolute", left: 440, top: 120, fontFamily: FONT, fontSize: 52, fontWeight: 900, color: INK }}>
-        这一期聊<span style={{ color: ORANGE }}>：</span>
+        本期我们要讲的是<span style={{ color: ORANGE }}>：</span>
       </div>
       <div style={{ position: "absolute", left: 440, top: CY - 300, width: 940, height: 600, overflow: "hidden",
         maskImage: "linear-gradient(transparent, #000 22%, #000 78%, transparent)", WebkitMaskImage: "linear-gradient(transparent, #000 22%, #000 78%, transparent)" }}>
-        {topics.map((t, k) => {
+        {[...topics, ...topics.slice(0, 3)].map((t, k) => {
           const off = (k - idx) * GAP;
           if (Math.abs(off) > 420) return null;
           const final = k === n - 1;

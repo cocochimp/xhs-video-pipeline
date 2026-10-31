@@ -108,7 +108,7 @@ export function studioApi(root: string): Plugin {
     return {
       voice: c.voice, voices: c.voices ?? [{ name: "温暖阿虎 2.0", speaker: c.voice?.speaker }], bgm: c.bgm ?? null,
       bgmFiles: files("assets/audio/bgm", /\.(mp3|wav|m4a)$/i),
-      sfx: [["pop", "弹出"], ["stamp", "盖章"], ["whoosh", "滑动"]].map(([kind, name]) => ({ kind, name, uses: sfxUses[kind] ?? 0 })),
+      sfx: [["pop", "弹出"], ["stamp", "盖章"], ["whoosh", "滑动"], ["tick", "滚动咔哒"], ["ding", "叮"]].map(([kind, name]) => ({ kind, name, uses: sfxUses[kind] ?? 0 })),
       poses: files("assets", /^pose_.+\.png$/), props: files("assets", /^prop_.+\.png$/),
       components: SHARED_COMPONENTS,
     };
@@ -195,7 +195,7 @@ export function studioApi(root: string): Plugin {
               const no = Math.max(0, ...nos) + 1, id = `ep${String(no).padStart(3, "0")}`;
               fs.mkdirSync(epDir(id), { recursive: true });
               writeEp(id, { id, no, total: 100, stage: "text", title: data.title.trim(),
-                segments: [{ id: "hook", gap: 0.4 }, { id: "open", gap: 0.3 }, { id: "title", gap: 1.4 }, { id: "body", gap: 0.5 }, { id: "end", gap: 0.6 }],
+                segments: [{ id: "open", gap: 0.3, rate: 38 }, { id: "title", gap: 2.35, rate: 38 }, { id: "body", gap: 0.5 }, { id: "end", gap: 0.6 }],
                 scenes: [], cost: { tts: 0, image: 0 } });
               enqueue({ ep: id, kind: "text" });
               return send(200, { id });

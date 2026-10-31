@@ -11,8 +11,8 @@ const S01: React.FC<SceneProps> = ({ at, dur }) => {
   return (
     <AbsoluteFill>
       <Sequence durationInFrames={at(1)}>
-        <Pose name="think" x={430} h={700} at={0} />
-        <BigText x={980} y={430} at={Math.max(0, at(0) + 18)} size={150} color={ORANGE} slam>提前退休？</BigText>
+        <Pose name="think" x={300} h={700} at={0} />
+        <BigText x={1010} y={420} at={Math.max(0, at(0) + 18)} size={140} color={ORANGE} slam>提前退休？</BigText>
       </Sequence>
       <Sequence from={at(1)} durationInFrames={dur - at(1)}>
         <Pose name="sign" x={720} h={760} at={0}

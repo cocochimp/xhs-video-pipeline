@@ -1,7 +1,7 @@
 import type React from "react";
 
 export type Line = { seg: string; zh: string; say: string };
-export type Sfx = { line: number; kind: "pop" | "stamp" | "whoosh"; vol: number; offset?: number };
+export type Sfx = { line: number; kind: "pop" | "stamp" | "whoosh" | "tick" | "ding"; vol: number; offset?: number };
 
 export type SceneData = {
   id: string;
@@ -22,7 +22,7 @@ export type EpisodeJson = {
   title: string;
   topic?: unknown;
   roll?: { after: string; dur: number; topics: string[] };
-  segments: { id: string; gap: number }[];
+  segments: { id: string; gap: number; rate?: number }[];
   scenes: SceneData[];
   cost: { tts: number; image: number };
 };

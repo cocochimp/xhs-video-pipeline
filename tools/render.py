@@ -24,7 +24,8 @@ def check_timeline(episode: dict, timeline: dict, voice: dict, dir_name: str) ->
     stale = []
     for seg, text in segment_speech(episode).items():
         have = timeline.get("segments", {}).get(seg, {}).get("hash")
-        if have != segment_hash(voice["speaker"], voice["rate"], text):
+        rate = next((g.get("rate", voice["rate"]) for g in episode["segments"] if g["id"] == seg), voice["rate"])
+        if have != segment_hash(voice["speaker"], rate, text):
             stale.append(f"配音段 {seg}")
     want = [(sc["id"], i, ln["zh"]) for sc in episode["scenes"] for i, ln in enumerate(sc["lines"])]
     got = [(ln["scene"], ln["i"], ln["zh"]) for ln in timeline.get("lines", [])]

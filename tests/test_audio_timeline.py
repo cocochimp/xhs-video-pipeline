@@ -56,10 +56,10 @@ def test_layout_times():
 def test_sfx_expansion_includes_roll_ticks():
     ep = make_episode()
     sfx = layout(ep, fake_seg_audio(ep), VOICE)["sfx"]
-    assert [s[1] for s in sfx] == ["pop", "pop", "stamp", "stamp"]
+    assert [s[1] for s in sfx] == ["pop", "tick", "ding", "stamp"]
     assert sfx[0][0] == pytest.approx(0.3)      # s01 第 0 句
     assert sfx[1][0] == pytest.approx(1.648)    # 选题滚过第 1 张
-    assert sfx[2] == [pytest.approx(2.6), "stamp", 0.8]   # 停在本期标题
+    assert sfx[2] == [pytest.approx(2.6), "ding", 0.9]   # 停在本期标题
     assert sfx[3][0] == pytest.approx(4.2)      # s03 第 1 句提前 0.1 秒
 
 
