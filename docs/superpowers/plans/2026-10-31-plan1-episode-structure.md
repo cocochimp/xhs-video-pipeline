@@ -197,6 +197,42 @@ def test_sfx_expansion_includes_roll_ticks():
 def test_segment_hash_changes_with_rate():
     assert segment_hash("x", 15, "文本") != segment_hash("x", 16, "文本")
     assert segment_hash("x", 15, "文本") == segment_hash("x", 15, "文本")
+
+
+def test_char_times_limits_skip_ahead():
+    words = [(0.0, 0.1, "十"), (0.1, 0.2, "个"), (0.2, 0.3, "人"),
+             (0.3, 0.4, "十"), (0.4, 0.5, "分"), (0.5, 0.6, "好")]
+    st, en = char_times("10个人，十分好", words)
+    chars = "10个人十分好"
+    assert st[chars.index("个")] == pytest.approx(0.1)
+    assert st == sorted(st)
+
+
+def test_char_times_splits_multichar_word_evenly():
+    st, en = char_times("一二三", [(0, 0.4, "一二")])
+    assert st[:2] == pytest.approx([0, 0.2])
+    assert en[:2] == pytest.approx([0.2, 0.4])
+
+
+def test_char_times_is_case_insensitive():
+    st, en = char_times("Hello", [(0, 0.5, "hello")])
+    assert en[-1] == pytest.approx(0.5)
+
+
+def test_layout_rejects_unknown_roll_target():
+    ep = make_episode()
+    ep["roll"]["after"] = "nope"
+    with pytest.raises(ValueError, match="nope"):
+        layout(ep, fake_seg_audio(ep), VOICE)
+
+
+def test_char_times_recovers_after_unmatched_word():
+    words = [(0.0, 0.2, "二零二四"), (0.2, 0.4, "年"), (0.4, 0.6, "的"), (0.6, 0.8, "春"),
+             (0.8, 1.0, "天"), (1.0, 1.2, "来"), (1.2, 1.4, "了")]
+    st, en = char_times("2024年的春天来了", words)
+    assert st[4] == pytest.approx(0.2)
+    assert en[-1] == pytest.approx(1.4)
+    assert st == sorted(st)
 ```
 
 - [ ] **Step 4: 运行测试，确认失败**
@@ -213,6 +249,7 @@ Expected: FAIL，`ModuleNotFoundError: No module named 'tools.audio_timeline'`
 ```python
 """配音时间轴的纯计算部分：不读写文件、不联网，供 build_audio.py 使用。"""
 
+import difflib
 import hashlib
 import re
 
@@ -223,7 +260,7 @@ ROLL_LEAD = 0.05   # 选题滚动在前一段配音结束后多久开始（秒�
 
 
 def norm(s: str) -> str:
-    return re.sub(r"[\W_]+", "", s)
+    return re.sub(r"[\W_]+", "", s).lower()
 
 
 def char_times(speech: str, words) -> tuple[list[float], list[float]]:
@@ -231,18 +268,17 @@ def char_times(speech: str, words) -> tuple[list[float], list[float]]:
     chars = norm(speech)
     st: list = [None] * len(chars)
     en: list = [None] * len(chars)
-    k = 0
+    tts_chars, tts_st, tts_en = [], [], []
     for s, e, w in words:
         w = norm(w)
-        if not w:
-            continue
-        pos = chars.find(w, k)
-        if pos < 0:
-            continue
-        for i in range(len(w)):
-            st[pos + i] = s + (e - s) * i / len(w)
-            en[pos + i] = s + (e - s) * (i + 1) / len(w)
-        k = pos + len(w)
+        for i, c in enumerate(w):
+            tts_chars.append(c)
+            tts_st.append(s + (e - s) * i / len(w))
+            tts_en.append(s + (e - s) * (i + 1) / len(w))
+    sm = difflib.SequenceMatcher(None, chars, "".join(tts_chars), autojunk=False)
+    for i, j, n in sm.get_matching_blocks():
+        for d in range(n):
+            st[i + d], en[i + d] = tts_st[j + d], tts_en[j + d]
     last = 0.0
     for i in range(len(chars)):
         if st[i] is None:
@@ -305,6 +341,8 @@ def layout(episode: dict, seg_audio: dict, voice: dict) -> dict:
     speech = segment_speech(episode)
     gaps = {s["id"]: s["gap"] for s in episode["segments"]}
     roll_cfg = episode.get("roll")
+    if roll_cfg and roll_cfg["after"] not in speech:
+        raise ValueError(f"选题滚动的目标配音段不存在：{roll_cfg['after']}")
     t0, segs, tables, roll = 0.0, {}, {}, None
     for seg, text in speech.items():
         t0 += gaps[seg]
@@ -345,7 +383,7 @@ def layout(episode: dict, seg_audio: dict, voice: dict) -> dict:
 - [ ] **Step 6: 运行测试，确认通过**
 
 Run: `.venv/bin/python -m pytest tests/test_audio_timeline.py -q`
-Expected: `8 passed`
+Expected: `13 passed`（含审查后补的对齐测试）
 
 - [ ] **Step 7: Commit**
 
@@ -396,6 +434,18 @@ def test_sync_recopies_changed_file(tmp_path):
     (tmp_path / "assets" / "a.png").write_bytes(b"png-v2")
     assert sync(tmp_path) == 1
     assert (tmp_path / "public/assets/a.png").read_bytes() == b"png-v2"
+
+
+def test_sync_recopies_same_size_file_with_older_mtime(tmp_path):
+    import os
+    _setup(tmp_path)
+    sync(tmp_path)
+    src = tmp_path / "assets" / "a.png"
+    src.write_bytes(b"pnx")
+    old = (tmp_path / "public/assets/a.png").stat().st_mtime - 100
+    os.utime(src, (old, old))
+    assert sync(tmp_path) == 1
+    assert (tmp_path / "public/assets/a.png").read_bytes() == b"pnx"
 ```
 
 - [ ] **Step 2: 运行测试，确认失败**
@@ -418,7 +468,7 @@ from pathlib import Path
 
 
 def _copy_if_changed(src: Path, dst: Path) -> bool:
-    if dst.exists() and dst.stat().st_size == src.stat().st_size and dst.stat().st_mtime >= src.stat().st_mtime:
+    if dst.exists() and dst.stat().st_size == src.stat().st_size and dst.stat().st_mtime == src.stat().st_mtime:
         return False
     dst.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dst)
@@ -535,6 +585,45 @@ def test_voice_change_revoices_all(ep_dir):
     build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
     build(ep_dir, synth=fake_synth(calls), voice={"speaker": "x", "rate": 20}, sync_root=None)
     assert len(calls) == 6
+
+
+def test_failed_revoice_leaves_no_stale_words(ep_dir):
+    calls = []
+    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
+
+    def bad_synth(text, out_path, speaker, speech_rate):
+        Path(out_path).write_bytes(b"ID3new")
+        return [] if text == "一二，三。" else words_for(text)
+
+    with pytest.raises(RuntimeError):
+        build(ep_dir, force=True, synth=bad_synth, voice=VOICE, sync_root=None)
+    assert not (ep_dir / "audio/words_body.json").exists()
+    calls.clear()
+    build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
+    assert [c[0] for c in calls] == ["一二，三。"]
+
+
+def test_invalid_episode_fails_before_any_tts(ep_dir):
+    ep = json.loads((ep_dir / "episode.json").read_text())
+    ep["scenes"][0]["sfx"][0]["line"] = 5
+    (ep_dir / "episode.json").write_text(json.dumps(ep, ensure_ascii=False))
+    calls = []
+    with pytest.raises(ValueError):
+        build(ep_dir, synth=fake_synth(calls), voice=VOICE, sync_root=None)
+    assert calls == []
+
+
+def test_cost_recorded_when_later_segment_fails(ep_dir):
+    def flaky(text, out_path, speaker, speech_rate):
+        if text != "开场。这期：":
+            raise OSError("network")
+        Path(out_path).write_bytes(b"ID3fake")
+        return words_for(text)
+
+    with pytest.raises(OSError):
+        build(ep_dir, synth=flaky, voice=VOICE, sync_root=None)
+    cost = json.loads((ep_dir / "episode.json").read_text())["cost"]["tts"]
+    assert cost == pytest.approx(len("开场。这期：") * PRICE)
 ```
 
 - [ ] **Step 2: 运行测试，确认失败**
@@ -592,26 +681,33 @@ def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = No
     episode = json.loads((ep_dir / "episode.json").read_text())
     audio = ep_dir / "audio"
     audio.mkdir(exist_ok=True)
+    speech = segment_speech(episode)
+    # 先用假音频走一遍排版，音效越界、空台词等错误在计费前暴露
+    layout(episode, {seg: {"duration": 1.0, "words": [], "hash": ""} for seg in speech}, voice)
     seg_audio, billed = {}, 0
-    for seg, text in segment_speech(episode).items():
-        key = segment_hash(voice["speaker"], voice["rate"], text)
-        wfile, mp3 = audio / f"words_{seg}.json", audio / f"vo_{seg}.mp3"
-        cached = json.loads(wfile.read_text()) if wfile.exists() and mp3.exists() else None
-        if force or not cached or cached["hash"] != key:
-            words = synth(text, mp3, speaker=voice["speaker"], speech_rate=voice["rate"])
-            if not words:
-                raise RuntimeError(f"配音段 {seg} 没有返回逐字时间")
-            cached = {"hash": key, "words": [list(w) for w in words]}
-            wfile.write_text(json.dumps(cached, ensure_ascii=False))
-            billed += len(text)
-            print(f"  配音 {seg}：{len(text)} 字")
-        words = [tuple(w) for w in cached["words"]]
-        seg_audio[seg] = {"duration": words[-1][1] + TAIL, "words": words, "hash": key}
-    tl = layout(episode, seg_audio, voice)
-    (audio / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1))
-    if billed:
-        episode["cost"]["tts"] = round(episode["cost"]["tts"] + billed * PRICE, 4)
-        (ep_dir / "episode.json").write_text(json.dumps(episode, ensure_ascii=False, indent=2) + "\n")
+    try:
+        for seg, text in speech.items():
+            key = segment_hash(voice["speaker"], voice["rate"], text)
+            wfile, mp3 = audio / f"words_{seg}.json", audio / f"vo_{seg}.mp3"
+            cached = json.loads(wfile.read_text()) if wfile.exists() and mp3.exists() else None
+            if force or not cached or cached["hash"] != key:
+                wfile.unlink(missing_ok=True)  # 合成失败时不能留下与新 mp3 不配套的旧缓存
+                words = synth(text, mp3, speaker=voice["speaker"], speech_rate=voice["rate"])
+                if not words:
+                    raise RuntimeError(f"配音段 {seg} 没有返回逐字时间")
+                cached = {"hash": key, "words": [list(w) for w in words]}
+                wfile.write_text(json.dumps(cached, ensure_ascii=False))
+                billed += len(text)
+                print(f"  配音 {seg}：{len(text)} 字")
+            words = [tuple(w) for w in cached["words"]]
+            seg_audio[seg] = {"duration": words[-1][1] + TAIL, "words": words, "hash": key}
+        tl = layout(episode, seg_audio, voice)
+        (audio / "timeline.json").write_text(json.dumps(tl, ensure_ascii=False, indent=1))
+    finally:
+        if billed:
+            tts = episode.setdefault("cost", {}).setdefault("tts", 0)
+            episode["cost"]["tts"] = round(tts + billed * PRICE, 4)
+            (ep_dir / "episode.json").write_text(json.dumps(episode, ensure_ascii=False, indent=2) + "\n")
     if sync_root:
         sync(sync_root)
     return tl, billed
@@ -635,7 +731,7 @@ if __name__ == "__main__":
 - [ ] **Step 5: 运行全部测试，确认通过**
 
 Run: `.venv/bin/python -m pytest tests -q`
-Expected: `14 passed`
+Expected: `23 passed`
 
 - [ ] **Step 6: Commit**
 
@@ -1846,7 +1942,7 @@ npm run video:studio                                    # 在 Remotion Studio �
 - [ ] **Step 4: 全量验证**
 
 Run: `.venv/bin/python -m pytest tests -q && npx tsc -p . && echo ALL_OK`
-Expected: `14 passed` 和 `ALL_OK`
+Expected: `23 passed` 和 `ALL_OK`
 
 - [ ] **Step 5: Commit 并推送**
 
