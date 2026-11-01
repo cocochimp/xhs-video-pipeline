@@ -53,7 +53,7 @@ export const TodoPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
 };
 
 type Cat = { id: string; name: string; target?: number };
-type TopicRow = { id: string; title: string; angle?: string; cat: string; status: "ok" | "pending"; ep?: string; no?: number; stage?: string };
+type TopicRow = { id: string; title: string; angle?: string; fav?: boolean; cat: string; status: "ok" | "pending"; ep?: string; no?: number; stage?: string };
 
 /** 新建作品 = 选题库：分类、增删改、AI 出选题（先进「待审核」）、选一个开做 */
 export const NewPage: React.FC = () => {
@@ -75,7 +75,8 @@ export const NewPage: React.FC = () => {
   const ok = db.topics.filter((t) => t.status === "ok");
   const pending = db.topics.filter((t) => t.status === "pending");
   const name = (id: string) => db.categories.find((c) => c.id === id)?.name ?? "未分类";
-  const list = (cat === "pending" ? pending : ok.filter((t) => cat === "all" || t.cat === cat))
+  const favs = ok.filter((t) => t.fav);
+  const list = (cat === "pending" ? pending : cat === "fav" ? favs : ok.filter((t) => cat === "all" || t.cat === cat))
     .filter((t) => !q || t.title.includes(q));
   const title = own.trim() || ok.find((t) => t.id === pick)?.title || "";
   const create = () => { setBusy(true); api<{ id: string }>("episodes", { title }).then((r) => (location.hash = `work/${r.id}/text`)).catch((e) => { toast(e.message); setBusy(false); }); };
@@ -88,9 +89,9 @@ export const NewPage: React.FC = () => {
       <Title>新建作品</Title>
       <div className="topiclib">
         <nav className="cats" aria-label="分类">
-          {[{ id: "all", name: "全部", n: ok.length }, ...db.categories.map((c) => ({ ...c, n: ok.filter((t) => t.cat === c.id).length }))].map((c) => {
+          {[{ id: "all", name: "全部", n: ok.length }, { id: "fav", name: "收藏", n: favs.length }, ...db.categories.map((c) => ({ ...c, n: ok.filter((t) => t.cat === c.id).length }))].map((c) => {
             return (
-              <button key={c.id} className={`cat ${cat === c.id ? "on" : ""}`} onClick={() => setCat(c.id)} onDoubleClick={() => c.id !== "all" && renameCat(c as Cat)} title={c.id === "all" ? "" : "双击改名"}>
+              <button key={c.id} className={`cat ${cat === c.id ? "on" : ""}`} onClick={() => setCat(c.id)} onDoubleClick={() => c.id !== "all" && c.id !== "fav" && renameCat(c as Cat)} title={c.id === "all" || c.id === "fav" ? "" : "双击改名"}>
                 <span>{c.name}</span><span className="num small muted">{c.n}</span>
               </button>
             );
@@ -133,14 +134,15 @@ export const NewPage: React.FC = () => {
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }} onClick={(ev) => ev.stopPropagation()}>
                     {t.status === "pending" && <button className="btn" onClick={() => run(t.id, { status: "ok" }, "已通过")}>通过</button>}
                     <button className="btn ghost" onClick={() => setEditing({ id: t.id, title: t.title, angle: t.angle ?? "", cat: t.cat })}>{t.status === "pending" ? "改一下" : "编辑"}</button>
+                    {t.status === "ok" && <button className={`star ${t.fav ? "on" : ""}`} onClick={() => run(t.id, { fav: !t.fav }, t.fav ? "已取消收藏" : "已收藏")} aria-label={t.fav ? "取消收藏" : "收藏"} title={t.fav ? "取消收藏" : "收藏，想发的先存这里"}>{t.fav ? "★" : "☆"}</button>}
                     {!t.ep && <button className="btn ghost" onClick={() => confirm(`删除「${t.title}」？`) && run(`${t.id}/delete`, {}, "已删除")}>{t.status === "pending" ? "放弃" : "删除"}</button>}
                   </td>
                 </tr>
               ))}
-              {list.length === 0 && <tr><td colSpan={5} className="muted small" style={{ height: 80, textAlign: "center" }}>{cat === "pending" ? "没有待审核的选题。点「让 AI 出 5 个」。" : "这个分类还没有选题。"}</td></tr>}
+              {list.length === 0 && <tr><td colSpan={5} className="muted small" style={{ height: 80, textAlign: "center" }}>{cat === "pending" ? "没有待审核的选题。点「让 AI 出 5 个」。" : cat === "fav" ? "还没有收藏。点选题后面的 ☆，想发的先存这里。" : "这个分类还没有选题。"}</td></tr>}
             </tbody>
           </table>
-          {cat !== "pending" && (
+          {cat !== "pending" && cat !== "fav" && (
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
               <input type="text" value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="加一个选题" style={{ maxWidth: 360 }}
                 onKeyDown={(e) => e.key === "Enter" && adding.trim() && run("add", { title: adding, cat: db.categories.some((c) => c.id === cat) ? cat : "" }, "已加入").then(() => setAdding(""))} />

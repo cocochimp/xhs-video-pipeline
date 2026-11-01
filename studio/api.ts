@@ -85,7 +85,7 @@ export function studioApi(root: string): Plugin {
   };
 
   const topicsFile = P("studio/topics.json");
-  type Topic = { id: string; title: string; angle?: string; cat: string; status: "ok" | "pending"; at: string };
+  type Topic = { id: string; title: string; angle?: string; fav?: boolean; cat: string; status: "ok" | "pending"; at: string };
   type TopicDb = { categories: { id: string; name: string; target?: number }[]; topics: Topic[] };
   const readTopics = (): TopicDb => readJson(topicsFile, { categories: [], topics: [] });
   const writeTopics = (db: TopicDb) => fs.writeFileSync(topicsFile, JSON.stringify(db, null, 1) + "\n");
@@ -131,6 +131,7 @@ export function studioApi(root: string): Plugin {
           t.title = title;
         }
         if (data.angle !== undefined) t.angle = String(data.angle).trim() || undefined;
+        if (data.fav !== undefined) t.fav = Boolean(data.fav) || undefined;
         if (data.cat) t.cat = data.cat;
         if (data.status === "ok") t.status = "ok";
       }

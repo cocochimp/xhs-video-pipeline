@@ -156,6 +156,8 @@ video { width: 100%; border-radius: var(--radius-card); background: #000; }
 .cat { all: unset; cursor: pointer; display: grid; grid-template-columns: 1fr auto; padding: 8px 10px; border-radius: 8px; }
 .cat:hover { background: var(--raised); }
 .cat.on { background: var(--active); font-weight: 500; }
+.star { all: unset; cursor: pointer; font-size: 18px; color: var(--control); padding: 0 6px; vertical-align: middle; }
+.star:hover, .star.on { color: var(--accent); }
 .tlist td { height: 44px; padding-top: 8px; padding-bottom: 8px; }
 .newbox { position: sticky; top: 0; }
 @media (max-width: 1100px) { .topiclib { grid-template-columns: 1fr; } .cats { flex-direction: row; flex-wrap: wrap; position: static; } .newbox { position: static; } }
