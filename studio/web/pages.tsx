@@ -53,7 +53,7 @@ export const TodoPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
 };
 
 type Cat = { id: string; name: string; target?: number };
-type TopicRow = { id: string; title: string; cat: string; status: "ok" | "pending"; ep?: string; no?: number; stage?: string };
+type TopicRow = { id: string; title: string; angle?: string; cat: string; status: "ok" | "pending"; ep?: string; no?: number; stage?: string };
 
 /** 新建作品 = 选题库：分类、增删改、AI 出选题（先进「待审核」）、选一个开做 */
 export const NewPage: React.FC = () => {
@@ -64,7 +64,7 @@ export const NewPage: React.FC = () => {
   const [q, setQ] = useState("");
   const [pick, setPick] = useState("");
   const [own, setOwn] = useState("");
-  const [editing, setEditing] = useState<{ id: string; title: string; cat: string } | null>(null);
+  const [editing, setEditing] = useState<{ id: string; title: string; angle: string; cat: string } | null>(null);
   const [adding, setAdding] = useState("");
   const [hint, setHint] = useState("");
   const [busy, setBusy] = useState(false);
@@ -89,12 +89,9 @@ export const NewPage: React.FC = () => {
       <div className="topiclib">
         <nav className="cats" aria-label="分类">
           {[{ id: "all", name: "全部", n: ok.length }, ...db.categories.map((c) => ({ ...c, n: ok.filter((t) => t.cat === c.id).length }))].map((c) => {
-            const share = ok.length ? Math.round((c.n / ok.length) * 100) : 0;
-            const target = (c as Cat).target;
             return (
               <button key={c.id} className={`cat ${cat === c.id ? "on" : ""}`} onClick={() => setCat(c.id)} onDoubleClick={() => c.id !== "all" && renameCat(c as Cat)} title={c.id === "all" ? "" : "双击改名"}>
                 <span>{c.name}</span><span className="num small muted">{c.n}</span>
-                {target != null && <span className="share"><i style={{ width: `${Math.min(100, (share / target) * 100)}%` }} /><span className="small muted num">{share}% / {target}%</span></span>}
               </button>
             );
           })}
@@ -104,6 +101,7 @@ export const NewPage: React.FC = () => {
 
         <section className="tlist">
           <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            {db.topics.some((t) => !t.angle) && <button className="btn" disabled={suggesting} onClick={() => run("angles", {}, "AI 正在给没有方向的选题补方向")}>AI 补齐方向</button>}
             <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜索选题" style={{ maxWidth: 260 }} />
             <span className="sp" />
             <input type="text" value={hint} onChange={(e) => setHint(e.target.value)} placeholder="AI 出选题的方向（可不填）" style={{ maxWidth: 260 }} />
@@ -118,22 +116,23 @@ export const NewPage: React.FC = () => {
               {list.map((t) => editing?.id === t.id ? (
                 <tr key={t.id}>
                   <td />
-                  <td><input type="text" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} autoFocus /></td>
+                  <td><input type="text" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} autoFocus />
+                    <input type="text" value={editing.angle} onChange={(e) => setEditing({ ...editing, angle: e.target.value })} placeholder="选题方向：这期从哪个角度讲" style={{ marginTop: 6 }} /></td>
                   <td><select value={editing.cat} onChange={(e) => setEditing({ ...editing, cat: e.target.value })}>{db.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></td>
                   <td />
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
-                    <button className="btn primary" onClick={() => run(t.id, { title: editing.title, cat: editing.cat, ...(t.status === "pending" ? { status: "ok" } : {}) }, t.status === "pending" ? "已通过" : "已保存").then(() => setEditing(null))}>{t.status === "pending" ? "保存并通过" : "保存"}</button>
+                    <button className="btn primary" onClick={() => run(t.id, { title: editing.title, angle: editing.angle, cat: editing.cat, ...(t.status === "pending" ? { status: "ok" } : {}) }, t.status === "pending" ? "已通过" : "已保存").then(() => setEditing(null))}>{t.status === "pending" ? "保存并通过" : "保存"}</button>
                     <button className="btn ghost" onClick={() => setEditing(null)}>取消</button></td>
                 </tr>
               ) : (
                 <tr key={t.id} className={t.status === "ok" && !t.ep ? "click" : ""} onClick={() => t.status === "ok" && !t.ep && (setPick(t.id), setOwn(""))}>
                   <td>{t.status === "ok" && !t.ep && <input type="radio" name="tp" checked={!own && pick === t.id} onChange={() => { setPick(t.id); setOwn(""); }} aria-label="选这个" />}</td>
-                  <td>{t.title}</td>
+                  <td>{t.title}{t.angle && <div className="small muted">{t.angle}</div>}</td>
                   <td className="small muted">{name(t.cat)}</td>
                   <td>{t.status === "pending" ? <span className="pill warn">待审核</span> : status(t)}</td>
                   <td style={{ textAlign: "right", whiteSpace: "nowrap" }} onClick={(ev) => ev.stopPropagation()}>
                     {t.status === "pending" && <button className="btn" onClick={() => run(t.id, { status: "ok" }, "已通过")}>通过</button>}
-                    <button className="btn ghost" onClick={() => setEditing({ id: t.id, title: t.title, cat: t.cat })}>{t.status === "pending" ? "改一下" : "编辑"}</button>
+                    <button className="btn ghost" onClick={() => setEditing({ id: t.id, title: t.title, angle: t.angle ?? "", cat: t.cat })}>{t.status === "pending" ? "改一下" : "编辑"}</button>
                     {!t.ep && <button className="btn ghost" onClick={() => confirm(`删除「${t.title}」？`) && run(`${t.id}/delete`, {}, "已删除")}>{t.status === "pending" ? "放弃" : "删除"}</button>}
                   </td>
                 </tr>

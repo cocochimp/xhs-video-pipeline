@@ -52,8 +52,10 @@ def cmd_text(ep_dir: Path, issue: str = "") -> dict:
     before = load(ep_dir)
     rel = (ep_dir / "episode.json").relative_to(ROOT)
     example = json.dumps({k: load(EXAMPLE)[k] for k in ("roll", "scenes")}, ensure_ascii=False)
+    tdb = json.loads((ROOT / "studio/topics.json").read_text()) if (ROOT / "studio/topics.json").exists() else {"topics": []}
+    angle = next((t.get("angle") for t in tdb["topics"] if t["title"] == before["title"]), None)
     task = (f"按用户意见修改 {rel} 的文本：{issue}" if issue else
-            f"为选题「{before['title']}」写整期文本，写进 {rel}。")
+            f"为选题「{before['title']}」写整期文本，写进 {rel}。" + (f"选题方向：{angle}。按这个方向展开。" if angle else ""))
     prompt = "\n\n".join([
         "你在给小红书账号「阿牛要退休」（系列：阿牛FIRE计划，主角是想早点退休的打工奶牛阿牛）写一期手绘解说短视频的文本。账号内容四类：搞钱 40%、认知 30%、理财基础 20%、退休/FIRE 10%，选题在 studio/topics.json。",
         task,
@@ -235,6 +237,8 @@ def cmd_topics(arg: str) -> dict:
     """AI 出 5 个新选题，放进选题库的「待审核」。"""
     req = json.loads(arg or "{}")
     db = json.loads((ROOT / "studio/topics.json").read_text())
+    if req.get("angles"):
+        return fill_angles(db)
     cats = {c["id"]: c["name"] for c in db["categories"]}
     have = [t["title"] for t in db["topics"]]
     counts = {c: sum(t["cat"] == c for t in db["topics"]) for c in cats}
@@ -243,9 +247,10 @@ def cmd_topics(arg: str) -> dict:
         "你在给小红书账号「阿牛要退休」出选题。主角是想早点退休的打工奶牛阿牛，观众是刚毕业、被工资困住的年轻人。",
         f"分类：{json.dumps(cats, ensure_ascii=False)}。这次出 5 个「{cats.get(gap, gap)}」（id={gap}）类的选题。",
         f"方向：{req['hint']}" if req.get("hint") else "",
-        "要求：标题像小红书爆款标题，具体、有痛点，最好带数字或反问，20 字以内；有普适性，从打工人日常出发；不要和已有选题重复。",
+        "要求：标题像小红书爆款标题，具体、有痛点，最好带数字或反问，20 字以内；有普适性，从打工人日常出发；不要和已有选题重复。"
+        "每个选题再写一句「方向」（25 字以内）：这期从哪个角度讲、讲给谁、落到什么结论。",
         "已有选题：" + "；".join(have),
-        '只输出一行 JSON：{"topics": [{"title": "...", "cat": "<分类 id>"}]}',
+        '只输出一行 JSON：{"topics": [{"title": "...", "angle": "...", "cat": "<分类 id>"}]}',
     ])
     text, _ = claude(prompt, "topics", tools=READ_TOOLS)
     out = (last_json(text) or {}).get("topics") or []
@@ -259,11 +264,34 @@ def cmd_topics(arg: str) -> dict:
             continue
         n += 1
         seen.add(norm(title))
-        db["topics"].append({"id": f"t{n:03d}", "title": title, "cat": t.get("cat") if t.get("cat") in cats else gap,
+        db["topics"].append({"id": f"t{n:03d}", "title": title, "angle": str(t.get("angle", "")).strip() or None, "cat": t.get("cat") if t.get("cat") in cats else gap,
                              "status": "pending", "at": datetime.now().isoformat(timespec="seconds")})
         added.append(title)
     (ROOT / "studio/topics.json").write_text(json.dumps(db, ensure_ascii=False, indent=1) + "\n")
     return {"ok": bool(added), "added": added, **({} if added else {"error": "AI 没给出新的选题"})}
+
+
+def fill_angles(db: dict) -> dict:
+    """给没有方向的选题补一句方向（一次调用）。"""
+    todo = [t for t in db["topics"] if not t.get("angle")]
+    if not todo:
+        return {"ok": True, "filled": 0}
+    prompt = "\n\n".join([
+        "你在给小红书账号「阿牛要退休」的选题写「方向」。观众是刚毕业、被工资困住的年轻人。",
+        "每个选题写一句方向（25 字以内）：这期从哪个角度讲、讲给谁、落到什么结论。具体，不要空话。",
+        "选题：" + json.dumps([{"id": t["id"], "title": t["title"]} for t in todo], ensure_ascii=False),
+        '只输出一行 JSON：{"angles": {"<id>": "<方向>"}}',
+    ])
+    text, _ = claude(prompt, "topics", tools=READ_TOOLS, timeout=600)
+    got = (last_json(text) or {}).get("angles") or {}
+    db = json.loads((ROOT / "studio/topics.json").read_text())  # 期间可能有改动，重新读
+    n = 0
+    for t in db["topics"]:
+        a = str(got.get(t["id"], "")).strip()
+        if a and not t.get("angle"):
+            t["angle"], n = a, n + 1
+    (ROOT / "studio/topics.json").write_text(json.dumps(db, ensure_ascii=False, indent=1) + "\n")
+    return {"ok": n > 0, "filled": n, **({} if n else {"error": "AI 没给出方向"})}
 
 
 def cmd_voice(speaker: str, rate: int) -> dict:

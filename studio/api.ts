@@ -85,7 +85,7 @@ export function studioApi(root: string): Plugin {
   };
 
   const topicsFile = P("studio/topics.json");
-  type Topic = { id: string; title: string; cat: string; status: "ok" | "pending"; at: string };
+  type Topic = { id: string; title: string; angle?: string; cat: string; status: "ok" | "pending"; at: string };
   type TopicDb = { categories: { id: string; name: string; target?: number }[]; topics: Topic[] };
   const readTopics = (): TopicDb => readJson(topicsFile, { categories: [], topics: [] });
   const writeTopics = (db: TopicDb) => fs.writeFileSync(topicsFile, JSON.stringify(db, null, 1) + "\n");
@@ -103,12 +103,15 @@ export function studioApi(root: string): Plugin {
       if (!title) return { code: 400, body: { error: "选题不能为空" } };
       if (dup(title)) return { code: 409, body: { error: "选题库里已经有这个选题" } };
       const n = Math.max(0, ...db.topics.map((t) => +t.id.slice(1))) + 1;
-      db.topics.push({ id: `t${String(n).padStart(3, "0")}`, title, cat: data.cat || db.categories[0]?.id, status: "ok", at: now });
+      db.topics.push({ id: `t${String(n).padStart(3, "0")}`, title, angle: String(data.angle ?? "").trim() || undefined, cat: data.cat || db.categories[0]?.id, status: "ok", at: now });
     } else if (u[1] === "cat") {
       const name = String(data.name ?? "").trim();
       if (!name) return { code: 400, body: { error: "分类名不能为空" } };
       const c = db.categories.find((x) => x.id === data.id);
       if (c) c.name = name; else db.categories.push({ id: `c${Date.now().toString(36)}`, name });
+    } else if (u[1] === "angles") {
+      enqueue({ kind: "topics", arg: JSON.stringify({ angles: true }) });
+      return { code: 200, body: { ok: true } };
     } else if (u[1] === "suggest") {
       enqueue({ kind: "topics", arg: JSON.stringify({ cat: data.cat ?? "", hint: data.hint ?? "" }) });
       return { code: 200, body: { ok: true } };
@@ -127,6 +130,7 @@ export function studioApi(root: string): Plugin {
           if (used && title !== t.title) return { code: 409, body: { error: "已经做成作品的选题，到作品里改标题" } };
           t.title = title;
         }
+        if (data.angle !== undefined) t.angle = String(data.angle).trim() || undefined;
         if (data.cat) t.cat = data.cat;
         if (data.status === "ok") t.status = "ok";
       }
