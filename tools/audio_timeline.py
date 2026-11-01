@@ -2,13 +2,14 @@
 
 import difflib
 import hashlib
+import math
 import re
 
 FPS = 30
 TAIL = 0.25        # 每段最后一个字之后留的余量（秒）
 END_PAD = 1.2      # 全片最后留白（秒）
 ROLL_LEAD = 0.05
-SFX_MAX = 8                       # 每期场景音效上限（选题滚动的咔哒不算）
+SFX_MAX = 8                       # 每分钟场景音效上限（选题滚动的咔哒不算），长视频按分钟数放大
 SFX_KIND_MAX = {"pop": 4, "stamp": 3}
 SFX_GAP = 1.5                     # 两个场景音效最少间隔（秒）   # 选题滚动在前一段配音结束后多久开始（秒）
 SNAP_AHEAD = 0.2   # 台词开始后这么短的时间内若出现停顿，说明 TTS 时间戳偏早，吸附到停顿结束
@@ -103,12 +104,13 @@ def expand_sfx(episode: dict, lines: list[dict], roll: dict | None) -> list[list
 def limit_sfx(events: list[list]) -> list[list]:
     """音效不能密：按时间先到先得，离上一个太近、这种用满了、总数满了的都去掉。"""
     kept, used = [], {}
+    k = max(1, math.ceil(events[-1][0] / 60)) if events else 1  # 视频有几分钟
     for t, kind, vol in events:
         if kind not in SFX_KIND_MAX and kind in ("whoosh",):
             continue  # 已停用的音效
         if kept and t - kept[-1][0] < SFX_GAP:
             continue
-        if used.get(kind, 0) >= SFX_KIND_MAX.get(kind, SFX_MAX) or len(kept) >= SFX_MAX:
+        if used.get(kind, 0) >= SFX_KIND_MAX.get(kind, SFX_MAX) * k or len(kept) >= SFX_MAX * k:
             continue
         kept.append([t, kind, vol])
         used[kind] = used.get(kind, 0) + 1
