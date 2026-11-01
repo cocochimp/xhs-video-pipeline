@@ -2,7 +2,6 @@ import React, { useRef, useState } from "react";
 import { STAGES, Steps4, ago, api, stageIndex, useApp, usePoll, yuan, type Overview } from "./lib";
 
 type Ep = Overview["episodes"][number];
-type Topic = { title: string; group: string; ep?: string; stage?: string };
 
 const Title: React.FC<{ children: React.ReactNode; right?: React.ReactNode }> = ({ children, right }) => (
   <div className="titlerow"><h1>{children}</h1><span className="sp" />{right}</div>
@@ -53,35 +52,111 @@ export const TodoPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
   );
 };
 
+type Cat = { id: string; name: string; target?: number };
+type TopicRow = { id: string; title: string; cat: string; status: "ok" | "pending"; ep?: string; no?: number; stage?: string };
+
+/** 新建作品 = 选题库：分类、增删改、AI 出选题（先进「待审核」）、选一个开做 */
 export const NewPage: React.FC = () => {
-  const { ask, toast } = useApp();
-  const [topics] = usePoll<Topic[]>("topics", 60000);
+  const { toast } = useApp();
+  const [db, reload] = usePoll<{ categories: Cat[]; topics: TopicRow[] }>("topics", 5000);
+  const [jobs] = usePoll<{ kind: string; state: string; result?: { error?: string; added?: string[] } }[]>("jobs", 3000);
+  const [cat, setCat] = useState("all");
+  const [q, setQ] = useState("");
   const [pick, setPick] = useState("");
   const [own, setOwn] = useState("");
+  const [editing, setEditing] = useState<{ id: string; title: string; cat: string } | null>(null);
+  const [adding, setAdding] = useState("");
+  const [hint, setHint] = useState("");
   const [busy, setBusy] = useState(false);
-  const free = (topics ?? []).filter((t) => !t.ep);
-  const title = own.trim() || pick;
+  if (!db) return null;
+  const run = (path: string, body: object, msg?: string) => api(`topics/${path}`, body).then(() => { reload(); if (msg) toast(msg); }).catch((e) => toast(e.message));
+  const sj = [...(jobs ?? [])].reverse().find((j) => j.kind === "topics");
+  const suggesting = sj && (sj.state === "queued" || sj.state === "running");
+  const ok = db.topics.filter((t) => t.status === "ok");
+  const pending = db.topics.filter((t) => t.status === "pending");
+  const name = (id: string) => db.categories.find((c) => c.id === id)?.name ?? "未分类";
+  const list = (cat === "pending" ? pending : ok.filter((t) => cat === "all" || t.cat === cat))
+    .filter((t) => !q || t.title.includes(q));
+  const title = own.trim() || ok.find((t) => t.id === pick)?.title || "";
   const create = () => { setBusy(true); api<{ id: string }>("episodes", { title }).then((r) => (location.hash = `work/${r.id}/text`)).catch((e) => { toast(e.message); setBusy(false); }); };
+  const addCat = () => { const n = prompt("新分类的名字"); if (n) run("cat", { name: n }); };
+  const renameCat = (c: Cat) => { const n = prompt("分类改名", c.name); if (n && n !== c.name) run("cat", { id: c.id, name: n }); };
+  const status = (t: TopicRow) => t.ep ? <a className={`pill ${t.stage === "done" ? "pos" : "acc"}`} href={`#work/${t.ep}`}>第{t.no}期 · {t.stage === "done" ? "已完结" : STAGES[stageIndex(t.stage!)][1] + "中"}</a> : <span className="small muted">未使用</span>;
+
   return (
     <>
       <Title>新建作品</Title>
-      <div className="grid cols-2">
-        <div className="card">
-          <div style={{ display: "flex", alignItems: "center", marginBottom: 8 }}><h2>从选题库挑</h2><span className="sp" /><button className="btn" onClick={() => ask("再帮我想 5 个选题，加进选题库")}>让 AI 再出几个</button></div>
-          <div style={{ maxHeight: 420, overflow: "auto" }}>
-            {free.slice(0, 30).map((t) => (
-              <label key={t.title} className="radio"><input type="radio" name="tp" checked={!own && pick === t.title} onChange={() => { setPick(t.title); setOwn(""); }} />{t.title}<span className="sp" /><span className="small muted">{t.group}</span></label>
-            ))}
+      <div className="topiclib">
+        <nav className="cats" aria-label="分类">
+          {[{ id: "all", name: "全部", n: ok.length }, ...db.categories.map((c) => ({ ...c, n: ok.filter((t) => t.cat === c.id).length }))].map((c) => {
+            const share = ok.length ? Math.round((c.n / ok.length) * 100) : 0;
+            const target = (c as Cat).target;
+            return (
+              <button key={c.id} className={`cat ${cat === c.id ? "on" : ""}`} onClick={() => setCat(c.id)} onDoubleClick={() => c.id !== "all" && renameCat(c as Cat)} title={c.id === "all" ? "" : "双击改名"}>
+                <span>{c.name}</span><span className="num small muted">{c.n}</span>
+                {target != null && <span className="share"><i style={{ width: `${Math.min(100, (share / target) * 100)}%` }} /><span className="small muted num">{share}% / {target}%</span></span>}
+              </button>
+            );
+          })}
+          <button className={`cat ${cat === "pending" ? "on" : ""}`} onClick={() => setCat("pending")}><span>待审核</span><span className="num small muted">{pending.length}</span></button>
+          <button className="link small" style={{ margin: "8px 10px" }} onClick={addCat}>+ 新分类</button>
+        </nav>
+
+        <section className="tlist">
+          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+            <input type="text" value={q} onChange={(e) => setQ(e.target.value)} placeholder="搜索选题" style={{ maxWidth: 260 }} />
+            <span className="sp" />
+            <input type="text" value={hint} onChange={(e) => setHint(e.target.value)} placeholder="AI 出选题的方向（可不填）" style={{ maxWidth: 260 }} />
+            <button className="btn" disabled={suggesting} onClick={() => run("suggest", { cat: db.categories.some((c) => c.id === cat) ? cat : "", hint }, "AI 正在出 5 个选题，好了会出现在「待审核」").then(() => setHint(""))}>
+              {suggesting ? "AI 出选题中…" : "让 AI 出 5 个"}</button>
           </div>
-        </div>
-        <div className="card" style={{ alignSelf: "start" }}>
-          <h2>或者自己写</h2>
-          <input type="text" value={own} onChange={(e) => setOwn(e.target.value)} placeholder="一句话说清这期聊什么" />
-          <div style={{ display: "flex", alignItems: "center", marginTop: 16, gap: 12 }}>
-            <span className="small muted" style={{ flex: 1 }}>{title ? `选题：${title}` : "还没选"}</span>
-            <button className="btn primary" disabled={!title || busy} onClick={create}>{busy ? "创建中…" : "确定选题，写文本"}</button>
-          </div>
-        </div>
+          {sj?.state === "error" && <div className="notice neg" style={{ marginBottom: 12 }}>{sj.result?.error ?? "AI 没出成"}</div>}
+          {cat === "pending" && pending.length > 0 && <div className="small muted" style={{ marginBottom: 8 }}>AI 出的选题，通过后才进选题库。</div>}
+          <table>
+            <thead><tr><th style={{ width: 28 }} /><th>选题</th><th>分类</th><th>状态</th><th /></tr></thead>
+            <tbody>
+              {list.map((t) => editing?.id === t.id ? (
+                <tr key={t.id}>
+                  <td />
+                  <td><input type="text" value={editing.title} onChange={(e) => setEditing({ ...editing, title: e.target.value })} autoFocus /></td>
+                  <td><select value={editing.cat} onChange={(e) => setEditing({ ...editing, cat: e.target.value })}>{db.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></td>
+                  <td />
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    <button className="btn primary" onClick={() => run(t.id, { title: editing.title, cat: editing.cat, ...(t.status === "pending" ? { status: "ok" } : {}) }, t.status === "pending" ? "已通过" : "已保存").then(() => setEditing(null))}>{t.status === "pending" ? "保存并通过" : "保存"}</button>
+                    <button className="btn ghost" onClick={() => setEditing(null)}>取消</button></td>
+                </tr>
+              ) : (
+                <tr key={t.id} className={t.status === "ok" && !t.ep ? "click" : ""} onClick={() => t.status === "ok" && !t.ep && (setPick(t.id), setOwn(""))}>
+                  <td>{t.status === "ok" && !t.ep && <input type="radio" name="tp" checked={!own && pick === t.id} onChange={() => { setPick(t.id); setOwn(""); }} aria-label="选这个" />}</td>
+                  <td>{t.title}</td>
+                  <td className="small muted">{name(t.cat)}</td>
+                  <td>{t.status === "pending" ? <span className="pill warn">待审核</span> : status(t)}</td>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }} onClick={(ev) => ev.stopPropagation()}>
+                    {t.status === "pending" && <button className="btn" onClick={() => run(t.id, { status: "ok" }, "已通过")}>通过</button>}
+                    <button className="btn ghost" onClick={() => setEditing({ id: t.id, title: t.title, cat: t.cat })}>{t.status === "pending" ? "改一下" : "编辑"}</button>
+                    {!t.ep && <button className="btn ghost" onClick={() => confirm(`删除「${t.title}」？`) && run(`${t.id}/delete`, {}, "已删除")}>{t.status === "pending" ? "放弃" : "删除"}</button>}
+                  </td>
+                </tr>
+              ))}
+              {list.length === 0 && <tr><td colSpan={5} className="muted small" style={{ height: 80, textAlign: "center" }}>{cat === "pending" ? "没有待审核的选题。点「让 AI 出 5 个」。" : "这个分类还没有选题。"}</td></tr>}
+            </tbody>
+          </table>
+          {cat !== "pending" && (
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <input type="text" value={adding} onChange={(e) => setAdding(e.target.value)} placeholder="加一个选题" style={{ maxWidth: 360 }}
+                onKeyDown={(e) => e.key === "Enter" && adding.trim() && run("add", { title: adding, cat: db.categories.some((c) => c.id === cat) ? cat : "" }, "已加入").then(() => setAdding(""))} />
+              <button className="btn" disabled={!adding.trim()} onClick={() => run("add", { title: adding, cat: db.categories.some((c) => c.id === cat) ? cat : "" }, "已加入").then(() => setAdding(""))}>加入选题库</button>
+            </div>
+          )}
+        </section>
+
+        <aside className="card newbox">
+          <h2>新建作品</h2>
+          <div className="small muted" style={{ margin: "4px 0 12px" }}>在左边选一个未使用的选题，或者自己写一句。</div>
+          <div style={{ minHeight: 44, fontWeight: 500 }}>{title || <span className="muted">还没选</span>}</div>
+          <input type="text" value={own} onChange={(e) => setOwn(e.target.value)} placeholder="自己写一句" style={{ marginTop: 8 }} />
+          <button className="btn primary" style={{ width: "100%", marginTop: 12 }} disabled={!title || busy} onClick={create}>{busy ? "创建中…" : "确定选题，写文本"}</button>
+        </aside>
       </div>
     </>
   );
@@ -265,29 +340,6 @@ export const ComponentsPage: React.FC = () => {
           <table><thead><tr><th>组件</th><th>效果</th></tr></thead>
             <tbody>{lib.components.map(([n, d]) => <tr key={n}><td className="mono small">{n}</td><td>{d}</td></tr>)}</tbody></table></section>
       </div>
-    </>
-  );
-};
-
-export const TopicsPage: React.FC = () => {
-  const { ask } = useApp();
-  const [topics] = usePoll<Topic[]>("topics", 30000);
-  const [group, setGroup] = useState("");
-  const groups = [...new Set((topics ?? []).map((t) => t.group))];
-  const rows = (topics ?? []).filter((t) => !group || t.group === group);
-  return (
-    <>
-      <Title right={<button className="btn" onClick={() => ask("再帮我想 5 个选题，加进选题库")}>让 AI 出选题</button>}>选题库 <span className="muted small num">{topics?.length ?? ""}</span></Title>
-      <div style={{ width: 240, marginBottom: 16 }}><select value={group} onChange={(e) => setGroup(e.target.value)}><option value="">全部分类</option>{groups.map((g) => <option key={g}>{g}</option>)}</select></div>
-      <table>
-        <thead><tr><th>选题</th><th>分类</th><th>状态</th></tr></thead>
-        <tbody>{rows.map((t) => (
-          <tr key={t.title} className={t.ep ? "click" : ""} onClick={() => t.ep && (location.hash = `work/${t.ep}`)}>
-            <td>{t.title}</td><td className="muted small">{t.group}</td>
-            <td>{t.ep ? <span className={`pill ${t.stage === "done" ? "pos" : "acc"}`}>{t.stage === "done" ? "已完结" : STAGES[stageIndex(t.stage!)][1] + "中"}</span> : <span className="muted small">—</span>}</td>
-          </tr>
-        ))}</tbody>
-      </table>
     </>
   );
 };

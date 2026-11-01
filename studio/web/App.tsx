@@ -1,13 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { AppCtx, api, usePoll, type Overview } from "./lib";
-import { AudioPage, ComponentsPage, LibraryPage, NewPage, TodoPage, TopicsPage } from "./pages";
+import { AudioPage, ComponentsPage, LibraryPage, NewPage, TodoPage } from "./pages";
 import { WorkPage } from "./Work";
 
 const NAV = [
   ["审片台", [["new", "新建作品"], ["todo", "进行中"], ["done", "作品库"]]],
-  ["素材库", [["audio", "音效库"], ["comp", "组件库"], ["topics", "选题库"]]],
+  ["素材库", [["audio", "音效库"], ["comp", "组件库"]]],
 ] as const;
-const NAMES: Record<string, string> = { new: "新建作品", todo: "进行中", done: "作品库", audio: "音效库", comp: "组件库", topics: "选题库", work: "作品" };
+const NAMES: Record<string, string> = { new: "新建作品 · 选题库", todo: "进行中", done: "作品库", audio: "音效库", comp: "组件库", topics: "选题库", work: "作品" };
 
 const useHash = () => {
   const [h, setH] = useState(location.hash.slice(1) || "todo");
@@ -34,7 +34,7 @@ export const App: React.FC = () => {
 
   const content = {
     todo: <TodoPage eps={todo} />, new: <NewPage />, done: <LibraryPage eps={done} />,
-    audio: <AudioPage tab={arg} />, comp: <ComponentsPage />, topics: <TopicsPage />,
+    audio: <AudioPage tab={arg} />, comp: <ComponentsPage />, topics: <NewPage />,
     work: <WorkPage id={arg} tab={sub} />,
   }[page] ?? <TodoPage eps={todo} />;
 

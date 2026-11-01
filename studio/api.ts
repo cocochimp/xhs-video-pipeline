@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
 
-type Kind = "edit" | "undo" | "render" | "text" | "gen" | "apply" | "cover";
+type Kind = "edit" | "undo" | "render" | "text" | "gen" | "apply" | "cover" | "topics";
 type Job = { id: number; ep?: string; kind: Kind; scene?: string; arg?: string; state: "queued" | "running" | "done" | "error"; progress?: string; result?: unknown };
 
 const SHARED_COMPONENTS = [
@@ -53,6 +53,7 @@ export function studioApi(root: string): Plugin {
     if (j.kind === "render") return ["tools/render.py", ep, ...(j.arg ? [`--${j.arg}`] : [])];
     if (j.kind === "edit" || j.kind === "undo") return ["-m", "studio.edit", j.kind, ep, j.scene!, j.arg!];
     if (j.kind === "apply") return ["-m", "studio.work", "apply", j.arg!];
+    if (j.kind === "topics") return ["-m", "studio.work", "topics", j.arg!];
     return ["-m", "studio.work", j.kind, ep, ...(j.arg ? [j.arg] : [])];
   };
 
@@ -83,21 +84,55 @@ export function studioApi(root: string): Plugin {
     return usage.data;
   };
 
+  const topicsFile = P("studio/topics.json");
+  type Topic = { id: string; title: string; cat: string; status: "ok" | "pending"; at: string };
+  type TopicDb = { categories: { id: string; name: string; target?: number }[]; topics: Topic[] };
+  const readTopics = (): TopicDb => readJson(topicsFile, { categories: [], topics: [] });
+  const writeTopics = (db: TopicDb) => fs.writeFileSync(topicsFile, JSON.stringify(db, null, 1) + "\n");
   const topics = () => {
-    const titles = new Map(epIds().map((id) => { const e = readEp(id); return [norm(e.title), e] as const; }));
-    const seen = new Set<string>();
-    const out: { title: string; group: string; ep?: string; stage?: string }[] = [];
-    let group = "";
-    for (const line of fs.readFileSync(P("docs/选题库.md"), "utf8").split("\n")) {
-      const h = line.match(/^##\s+(.+)/);
-      if (h) { group = h[1].replace(/（\d+）/, "").trim(); continue; }
-      const m = line.match(/^- (.+)/);
-      if (!m || group.startsWith("每期") || seen.has(norm(m[1]))) continue;
-      seen.add(norm(m[1]));
-      const e = titles.get(norm(m[1]));
-      out.push({ title: m[1].trim(), group, ep: e?.id, stage: e?.stage });
+    const db = readTopics();
+    const eps = new Map(epIds().map((id) => { const e = readEp(id); return [norm(e.title), e] as const; }));
+    return { categories: db.categories, topics: db.topics.map((t) => { const e = eps.get(norm(t.title)); return { ...t, ep: e?.id, no: e?.no, stage: e?.stage }; }) };
+  };
+  const topicAction = (u: string[], data: Record<string, string>) => {
+    const db = readTopics();
+    const now = new Date().toISOString().slice(0, 19);
+    const dup = (title: string, except?: string) => db.topics.some((t) => t.id !== except && norm(t.title) === norm(title));
+    if (u[1] === "add") {
+      const title = String(data.title ?? "").trim();
+      if (!title) return { code: 400, body: { error: "选题不能为空" } };
+      if (dup(title)) return { code: 409, body: { error: "选题库里已经有这个选题" } };
+      const n = Math.max(0, ...db.topics.map((t) => +t.id.slice(1))) + 1;
+      db.topics.push({ id: `t${String(n).padStart(3, "0")}`, title, cat: data.cat || db.categories[0]?.id, status: "ok", at: now });
+    } else if (u[1] === "cat") {
+      const name = String(data.name ?? "").trim();
+      if (!name) return { code: 400, body: { error: "分类名不能为空" } };
+      const c = db.categories.find((x) => x.id === data.id);
+      if (c) c.name = name; else db.categories.push({ id: `c${Date.now().toString(36)}`, name });
+    } else if (u[1] === "suggest") {
+      enqueue({ kind: "topics", arg: JSON.stringify({ cat: data.cat ?? "", hint: data.hint ?? "" }) });
+      return { code: 200, body: { ok: true } };
+    } else {
+      const t = db.topics.find((x) => x.id === u[1]);
+      if (!t) return { code: 404, body: { error: "没有这个选题" } };
+      const used = topics().topics.find((x) => x.id === t.id)?.ep;
+      if (u[2] === "delete") {
+        if (used) return { code: 409, body: { error: "这个选题已经做成作品了，不能删" } };
+        db.topics = db.topics.filter((x) => x.id !== t.id);
+      } else {
+        if (data.title !== undefined) {
+          const title = String(data.title).trim();
+          if (!title) return { code: 400, body: { error: "选题不能为空" } };
+          if (dup(title, t.id)) return { code: 409, body: { error: "选题库里已经有这个选题" } };
+          if (used && title !== t.title) return { code: 409, body: { error: "已经做成作品的选题，到作品里改标题" } };
+          t.title = title;
+        }
+        if (data.cat) t.cat = data.cat;
+        if (data.status === "ok") t.status = "ok";
+      }
     }
-    return out;
+    writeTopics(db);
+    return { code: 200, body: { ok: true } };
   };
 
   const library = () => {
@@ -167,6 +202,7 @@ export function studioApi(root: string): Plugin {
             if (GET && u[0] === "jobs") return send(200, jobs.slice(-30));
             if (GET && u[0] === "library") return send(200, library());
             if (GET && u[0] === "topics") return send(200, topics());
+            if (POST && u[0] === "topics") { const r = topicAction(u, data); return send(r.code, r.body); }
             if (GET && u[0] === "chat") return send(200, { busy: chatBusy, messages: readJson(P("studio/chat.json"), []) });
             if (GET && u[0] === "video") {
               const name = `${u[1]}${q.get("hd") ? "-hd" : ""}.mp4`, file = P("out", u[1], name);

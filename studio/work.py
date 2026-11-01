@@ -55,7 +55,7 @@ def cmd_text(ep_dir: Path, issue: str = "") -> dict:
     task = (f"按用户意见修改 {rel} 的文本：{issue}" if issue else
             f"为选题「{before['title']}」写整期文本，写进 {rel}。")
     prompt = "\n\n".join([
-        "你在给小红书账号「阿牛要退休」（系列：阿牛FIRE计划，主角是想早点退休的打工奶牛阿牛）写一期手绘解说短视频的文本。账号内容四类：搞钱 40%、认知 30%、理财基础 20%、退休/FIRE 10%，见 docs/选题库.md。",
+        "你在给小红书账号「阿牛要退休」（系列：阿牛FIRE计划，主角是想早点退休的打工奶牛阿牛）写一期手绘解说短视频的文本。账号内容四类：搞钱 40%、认知 30%、理财基础 20%、退休/FIRE 10%，选题在 studio/topics.json。",
         task,
         "要求：全片至少 60 秒，所有 say 加起来至少 330 字（语速约每秒 5.5 字），上不封顶：内容完整、有逻辑最重要。"
         "清单类选题（比如「普通人还能靠这十条搞钱」）就把每一条讲完整，视频到 3～4 分钟也可以；不要为了凑时长灌水。"
@@ -150,7 +150,7 @@ def cmd_gen(ep_dir: Path) -> dict:
 
 CHAT_RULES = """你是「阿牛工作台」里的 AI 助手，帮用户管理小红书账号「阿牛要退休」的视频素材。用中文回答，简短。
 项目结构：assets/（阿牛姿势 pose_*.png、道具 prop_*.png）、assets/audio/bgm/（背景音乐）、studio/config.json（配音音色 voice、背景音乐 bgm、音色列表 voices）、
-docs/选题库.md（选题）、episodes/<期>/（episode.json 文本，scenes/*.tsx 分镜代码）、shared/ui.tsx（动画组件）。
+studio/topics.json（选题库：categories 分类、topics 选题，AI 新出的选题 status 写 pending 等用户审核）、episodes/<期>/（episode.json 文本，scenes/*.tsx 分镜代码）、shared/ui.tsx（动画组件）。
 画新素材：.venv/bin/python tools/gen_asset.py <英文名> "<中文描述>"，每张 0.12 元。
 现在只讨论，不改文件。如果需要改动，说清楚改哪些文件、预计花费。
 最后一行输出 JSON：{"reply": "<给用户看的回答>", "plan": "<要执行的改动，一句话；不需要改动则为 null>"}"""
@@ -231,6 +231,41 @@ def cmd_cover(ep_dir: Path, n: int = 3) -> dict:
     return {"ok": True, "files": [m["file"] for m in made]}
 
 
+def cmd_topics(arg: str) -> dict:
+    """AI 出 5 个新选题，放进选题库的「待审核」。"""
+    req = json.loads(arg or "{}")
+    db = json.loads((ROOT / "studio/topics.json").read_text())
+    cats = {c["id"]: c["name"] for c in db["categories"]}
+    have = [t["title"] for t in db["topics"]]
+    counts = {c: sum(t["cat"] == c for t in db["topics"]) for c in cats}
+    gap = req.get("cat") or min(cats, key=lambda c: counts[c] / max(1, next(x.get("target", 10) for x in db["categories"] if x["id"] == c)))
+    prompt = "\n\n".join([
+        "你在给小红书账号「阿牛要退休」出选题。主角是想早点退休的打工奶牛阿牛，观众是刚毕业、被工资困住的年轻人。",
+        f"分类：{json.dumps(cats, ensure_ascii=False)}。这次出 5 个「{cats.get(gap, gap)}」（id={gap}）类的选题。",
+        f"方向：{req['hint']}" if req.get("hint") else "",
+        "要求：标题像小红书爆款标题，具体、有痛点，最好带数字或反问，20 字以内；有普适性，从打工人日常出发；不要和已有选题重复。",
+        "已有选题：" + "；".join(have),
+        '只输出一行 JSON：{"topics": [{"title": "...", "cat": "<分类 id>"}]}',
+    ])
+    text, _ = claude(prompt, "topics", tools=READ_TOOLS)
+    out = (last_json(text) or {}).get("topics") or []
+    norm = lambda s: "".join(ch for ch in s if ch not in "？?！!，,。. ：:")
+    seen = {norm(t) for t in have}
+    n = max([int(t["id"][1:]) for t in db["topics"]] or [0])
+    added = []
+    for t in out[:5]:
+        title = str(t.get("title", "")).strip()
+        if not title or norm(title) in seen:
+            continue
+        n += 1
+        seen.add(norm(title))
+        db["topics"].append({"id": f"t{n:03d}", "title": title, "cat": t.get("cat") if t.get("cat") in cats else gap,
+                             "status": "pending", "at": datetime.now().isoformat(timespec="seconds")})
+        added.append(title)
+    (ROOT / "studio/topics.json").write_text(json.dumps(db, ensure_ascii=False, indent=1) + "\n")
+    return {"ok": bool(added), "added": added, **({} if added else {"error": "AI 没给出新的选题"})}
+
+
 def cmd_voice(speaker: str, rate: int) -> dict:
     """试听一个音色，按 音色+语速 缓存。约 0.01 元。"""
     import hashlib
@@ -253,7 +288,7 @@ def main():
         pipeline.load_env()
     res = {"text": lambda: cmd_text(Path(a[0]), a[1] if len(a) > 1 else ""), "gen": lambda: cmd_gen(Path(a[0])),
            "chat": lambda: cmd_chat(*a[:3]), "apply": lambda: cmd_apply(a[0]), "previews": cmd_previews,
-           "voice": lambda: cmd_voice(a[0], int(a[1])), "cover": lambda: cmd_cover(Path(a[0])), "register": lambda: register_episodes() or {"ok": True}}[cmd]()
+           "voice": lambda: cmd_voice(a[0], int(a[1])), "cover": lambda: cmd_cover(Path(a[0])), "topics": lambda: cmd_topics(a[0]), "register": lambda: register_episodes() or {"ok": True}}[cmd]()
     print(json.dumps(res, ensure_ascii=False))
     sys.exit(0 if res.get("ok") else 1)
 
