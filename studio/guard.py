@@ -5,7 +5,7 @@ import json
 import shutil
 from pathlib import Path
 
-SCENE_FIELDS = ("lines", "visual", "sfx")      # AI 可以改的场景字段
+SCENE_FIELDS = ("lines", "visual", "sfx", "name")  # AI 可以改的场景字段（name 是片名，改动作时常跟着改）
 META_FIELDS = ("status", "rounds", "updated", "voiceUpdated", "costWarn", "textStatus")  # 场景级；期级的 cover/covers 由网站维护  # 网站维护的字段
 
 
@@ -64,8 +64,13 @@ def check_boundary(root: Path, ep_dir: Path, before: dict, after: dict,
         if path.startswith("assets/") and path not in before:
             continue  # 新增素材允许
         bad.append(f"改动了不允许的文件：{path}")
-    if _strip(ep_before, scene_id) != _strip(ep_after, scene_id):
-        bad.append("episode.json 中本片 lines/visual/sfx 以外的内容被改动")
+    b, a2 = _strip(ep_before, scene_id), _strip(ep_after, scene_id)
+    if b != a2:
+        what = [k for k in set(b) | set(a2) if k != "scenes" and b.get(k) != a2.get(k)]
+        sb, sa = {x["id"]: x for x in b["scenes"]}, {x["id"]: x for x in a2["scenes"]}
+        what += [f"{i}.{k}" for i in sorted(set(sb) | set(sa)) for k in set(sb.get(i, {})) | set(sa.get(i, {}))
+                 if sb.get(i, {}).get(k) != sa.get(i, {}).get(k)]
+        bad.append("改到了本片以外的内容：" + "、".join(sorted(what)[:6]))
     return bad
 
 
