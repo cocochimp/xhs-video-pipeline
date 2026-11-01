@@ -2,7 +2,7 @@
   "id": "ep001",
   "no": 1,
   "total": 100,
-  "stage": "review",
+  "stage": "done",
   "topic": {
     "candidates": [],
     "chosen": null,
@@ -75,7 +75,7 @@
         }
       ],
       "textStatus": "approved",
-      "status": "pending",
+      "status": "approved",
       "rounds": [
         {
           "n": 1,
@@ -85,7 +85,7 @@
           "at": "2026-10-31T20:00:56"
         }
       ],
-      "updated": true,
+      "updated": false,
       "costWarn": false,
       "voiceUpdated": false
     },
@@ -107,7 +107,7 @@
       ],
       "sfx": [],
       "textStatus": "approved",
-      "status": "pending",
+      "status": "approved",
       "rounds": [
         {
           "n": 1,
@@ -117,7 +117,7 @@
           "at": "2026-10-31T20:02:47"
         }
       ],
-      "updated": true,
+      "updated": false,
       "costWarn": false,
       "voiceUpdated": false
     },
@@ -150,9 +150,9 @@
         }
       ],
       "textStatus": "approved",
-      "status": "pending",
+      "status": "approved",
       "rounds": [],
-      "updated": true,
+      "updated": false,
       "voiceUpdated": false,
       "costWarn": false
     },
@@ -185,9 +185,9 @@
         }
       ],
       "textStatus": "approved",
-      "status": "pending",
+      "status": "approved",
       "rounds": [],
-      "updated": true,
+      "updated": false,
       "voiceUpdated": false,
       "costWarn": false
     },
@@ -214,9 +214,9 @@
       ],
       "sfx": [],
       "textStatus": "approved",
-      "status": "pending",
+      "status": "approved",
       "rounds": [],
-      "updated": true,
+      "updated": false,
       "voiceUpdated": false,
       "costWarn": false
     },
@@ -249,9 +249,9 @@
         }
       ],
       "textStatus": "approved",
-      "status": "pending",
+      "status": "approved",
       "rounds": [],
-      "updated": true,
+      "updated": false,
       "voiceUpdated": false,
       "costWarn": false
     },
@@ -278,9 +278,9 @@
       ],
       "sfx": [],
       "textStatus": "approved",
-      "status": "pending",
+      "status": "approved",
       "rounds": [],
-      "updated": true,
+      "updated": false,
       "voiceUpdated": false,
       "costWarn": false
     },
@@ -308,9 +308,9 @@
         }
       ],
       "textStatus": "approved",
-      "status": "pending",
+      "status": "approved",
       "rounds": [],
-      "updated": true,
+      "updated": false,
       "voiceUpdated": false,
       "costWarn": false
     },
@@ -337,9 +337,9 @@
       ],
       "sfx": [],
       "textStatus": "approved",
-      "status": "pending",
+      "status": "approved",
       "rounds": [],
-      "updated": true,
+      "updated": false,
       "voiceUpdated": false,
       "costWarn": false
     },
@@ -387,5 +387,6 @@
   "cost": {
     "tts": 0.2694,
     "image": 0.12
-  }
+  },
+  "doneAt": "2026-10-31T14:13:02.315Z"
 }
