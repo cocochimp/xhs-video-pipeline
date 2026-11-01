@@ -148,6 +148,14 @@ def poses_by_blob(img: Image.Image, n: int) -> list[Image.Image]:
     return out
 
 
+def padded_grid(img: Image.Image, cols: int, rows: int, pad: float = 0.18) -> list[Image.Image]:
+    """每格向四周多取 18%：伸出格子的尾巴、把手不会被切掉；邻格伸进来的东西由 largest_blob 去掉。"""
+    w, h = img.width / cols, img.height / rows
+    return [img.crop((int(max(0, (c - pad) * w)), int(max(0, (r - pad) * h)),
+                      int(min(img.width, (c + 1 + pad) * w)), int(min(img.height, (r + 1 + pad) * h))))
+            for r in range(rows) for c in range(cols)]
+
+
 def split(name: str, raw: Path):
     img = Image.open(raw).convert("RGB")
     if name in POSES:
@@ -156,7 +164,7 @@ def split(name: str, raw: Path):
     elif name in SINGLE:
         cutout(largest_blob(img)).save(PUB / f"{name}.png")
     elif name == "props":
-        for label, cell in zip(PROPS, grid(img, 4, 3)):
+        for label, cell in zip(PROPS, padded_grid(img, 4, 3)):
             cutout(largest_blob(cell), outline=7).save(PUB / f"prop_{label}.png")
 
 
