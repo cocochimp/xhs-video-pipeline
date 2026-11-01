@@ -181,7 +181,7 @@ export const LibraryPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
               info={<>{e.duration ? `${Math.round(e.duration)} 秒` : "—"} · {yuan(e.cost)} · {e.doneAt ? ago(Date.parse(e.doneAt)) + "完结" : "已完结"}</>}
               actions={<>{e.hd ? <a className="btn primary" href={`/api/video/${e.id}?hd=1&download=1`}>下载高清</a>
                 : <button className="btn primary" disabled={exporting(e.id)} onClick={() => api(`episodes/${e.id}/export`, {}).then(() => toast("开始导出高清（2160×1620），约 5 分钟"))}>{exporting(e.id) ? "导出中…" : "导出高清"}</button>}
-                {e.cover && <a className="btn" href={e.cover} download>下载封面</a>}
+                {e.cover && <a className="btn" href={`/api/cover/${e.id}`}>下载封面</a>}
                 <button className="btn" onClick={() => reopen(e)}>重新审片</button></>} />
           ))}
         </div>

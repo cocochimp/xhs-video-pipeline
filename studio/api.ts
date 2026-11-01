@@ -209,10 +209,17 @@ export function studioApi(root: string): Plugin {
             if (GET && u[0] === "topics") return send(200, topics());
             if (POST && u[0] === "topics") { const r = topicAction(u, data); return send(r.code, r.body); }
             if (GET && u[0] === "chat") return send(200, { busy: chatBusy, messages: readJson(P("studio/chat.json"), []) });
+            if (GET && u[0] === "cover") { // 下载封面：统一叫 ep001.jpg
+              const e = /^ep\d+$/.test(u[1] ?? "") ? readEp(u[1]) : null;
+              const file = e?.cover ? path.join(epDir(u[1]), "covers", path.basename(e.cover)) : "";
+              if (!file || !fs.existsSync(file)) return send(404, { error: "这一期还没选封面" });
+              res.writeHead(200, { "content-type": "image/jpeg", "content-disposition": `attachment; filename="${u[1]}.jpg"` });
+              return void fs.createReadStream(file).pipe(res);
+            }
             if (GET && u[0] === "video") {
               const name = `${u[1]}${q.get("hd") ? "-hd" : ""}.mp4`, file = P("out", u[1], name);
               if (!/^ep\d+$/.test(u[1] ?? "") || !fs.existsSync(file)) return send(404, { error: "还没有这个视频" });
-              if (q.get("download")) res.setHeader("content-disposition", `attachment; filename="${name}"`);
+              if (q.get("download")) res.setHeader("content-disposition", `attachment; filename="${u[1]}.mp4"`); // 下载统一叫 ep001.mp4
               return sendFile(res, file, req.headers.range);
             }
             if (POST && u[0] === "config") {
