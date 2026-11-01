@@ -10,14 +10,13 @@ const Title: React.FC<{ children: React.ReactNode; right?: React.ReactNode }> = 
 
 /** 进行中和作品库共用的作品卡片：封面 + 内容 */
 const WorkCard: React.FC<{ e: Ep; onCover?: () => void; cover?: React.ReactNode; info: React.ReactNode; actions: React.ReactNode }> = ({ e, onCover, cover, info, actions }) => {
-  const src = e.cover ?? (e.scenes ? `/thumbs/${e.id}/s02.jpg?${e.updated}` : null);
+  const src = e.cover;
   return (
     <article className="work">
       <div className="cover">
         {cover ?? (
           <button className="coverbtn" onClick={onCover} aria-label={`打开第 ${e.no} 期`}>
-            {src ? <img src={src} alt="" onError={(ev) => ((ev.target as HTMLImageElement).style.visibility = "hidden")} /> : null}
-            {!e.cover && <span className="covertag small">{e.scenes ? "未选封面" : "还没有画面"}</span>}
+            {src ? <img src={src} alt="" /> : <span className="coverempty small">未选封面</span>}
           </button>
         )}
       </div>
