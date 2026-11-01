@@ -6,7 +6,7 @@ import shutil
 from pathlib import Path
 
 SCENE_FIELDS = ("lines", "visual", "sfx")      # AI 可以改的场景字段
-META_FIELDS = ("status", "rounds", "updated", "voiceUpdated", "costWarn", "textStatus")  # 网站维护的字段
+META_FIELDS = ("status", "rounds", "updated", "voiceUpdated", "costWarn", "textStatus")  # 场景级；期级的 cover/covers 由网站维护  # 网站维护的字段
 
 
 def _files(root: Path, ep_dir: Path) -> list[Path]:

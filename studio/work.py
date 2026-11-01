@@ -189,6 +189,42 @@ def cmd_previews() -> dict:
     return {"ok": True}
 
 
+COVER_STYLE = (  # 定稿风格：满版俯视房间（ip/cover/styles/E2-俯视房间满版_*.jpg）
+    "彩色铅笔加马克笔的手绘素描插画，粗黑钢笔轮廓线略带抖动，阴影用细密的交叉排线，纸张颗粒感，暖色调（原木色、米黄、砖红、蓝），竖版 3:4 小红书封面。"
+    "主角是参考图里的「阿牛」：拟人化黑白花奶牛打工人，Q版大头，米色小角，粉色大鼻子，黑色豆豆眼，白衬衫深灰西裤，脖子挂橙色挂绳白色工牌，造型配色必须和参考图完全一致。"
+    "整张画面从上到下都是同一个房间场景，没有任何留白或纯色块：标题直接写在房间上半部分的墙面上，粗壮圆润、略带手写抖动的黑色大字，"
+    "最关键的几个字用红色，文字有一圈白色描边，字很大很清楚。镜头从高处 45 度俯视一间温馨的小书房：木地板、红色地毯、靠墙的木书架、"
+    "墙上软木板贴着便签、窗外是城市楼房。阿牛在画面中下部，约占画面高度 35%。整张图颜色统一。除标题外不要写其他字。")
+COVER_PRICE = 0.12
+
+
+def cmd_cover(ep_dir: Path, n: int = 3) -> dict:
+    """按定稿风格生成 n 张封面候选，写进 episode.json 的 covers；每张 0.12 元。"""
+    import pipeline as P
+    ep_dir = ep_dir.resolve()
+    ep = load(ep_dir)
+    body = [l["zh"].replace("【", "").replace("】", "") for sc in ep["scenes"][2:5] for l in sc["lines"]][:4]
+    P.IMAGE_MODEL, P.IMAGE_SIZE = "doubao-seedream-5-0-flash-260915", "1080x1440"
+    out_dir, pub = ep_dir / "covers", ROOT / "public/covers" / ep_dir.name
+    out_dir.mkdir(exist_ok=True)
+    pub.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%m%d%H%M%S")
+    made = []
+    for k in range(n):
+        log(f"封面 {k + 1}/{n}")
+        prompt = (f"{COVER_STYLE}\n标题「{ep['title']}」，按意思分成两到三行。"
+                  f"阿牛在房间里做和这期内容相关的事，身边放着相关的道具；这期讲的是：{'；'.join(body)}。")
+        f = out_dir / f"c{stamp}_{k + 1}.jpg"
+        P.seedream(prompt, f, ref=ROOT / "aniu/raw/character.jpg")
+        (pub / f.name).write_bytes(f.read_bytes())
+        made.append({"file": f.name, "at": datetime.now().isoformat(timespec="seconds")})
+        ep = load(ep_dir)
+        ep.setdefault("cost", {})["image"] = round(ep["cost"].get("image", 0) + COVER_PRICE, 4)
+        ep["covers"] = ep.get("covers", []) + [made[-1]]
+        write_episode(ep_dir, ep)
+    return {"ok": True, "files": [m["file"] for m in made]}
+
+
 def cmd_voice(speaker: str, rate: int) -> dict:
     """试听一个音色，按 音色+语速 缓存。约 0.01 元。"""
     import hashlib
@@ -206,12 +242,12 @@ def cmd_voice(speaker: str, rate: int) -> dict:
 
 def main():
     cmd, a = sys.argv[1], sys.argv[2:]
-    if cmd in ("text", "gen", "voice"):
+    if cmd in ("text", "gen", "voice", "cover"):
         import pipeline
         pipeline.load_env()
     res = {"text": lambda: cmd_text(Path(a[0]), a[1] if len(a) > 1 else ""), "gen": lambda: cmd_gen(Path(a[0])),
            "chat": lambda: cmd_chat(*a[:3]), "apply": lambda: cmd_apply(a[0]), "previews": cmd_previews,
-           "voice": lambda: cmd_voice(a[0], int(a[1])), "register": lambda: register_episodes() or {"ok": True}}[cmd]()
+           "voice": lambda: cmd_voice(a[0], int(a[1])), "cover": lambda: cmd_cover(Path(a[0])), "register": lambda: register_episodes() or {"ok": True}}[cmd]()
     print(json.dumps(res, ensure_ascii=False))
     sys.exit(0 if res.get("ok") else 1)
 

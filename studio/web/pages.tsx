@@ -8,28 +8,47 @@ const Title: React.FC<{ children: React.ReactNode; right?: React.ReactNode }> = 
   <div className="titlerow"><h1>{children}</h1><span className="sp" />{right}</div>
 );
 
+/** 进行中和作品库共用的作品卡片：封面 + 内容 */
+const WorkCard: React.FC<{ e: Ep; onCover?: () => void; cover?: React.ReactNode; info: React.ReactNode; actions: React.ReactNode }> = ({ e, onCover, cover, info, actions }) => {
+  const src = e.cover ?? (e.scenes ? `/thumbs/${e.id}/s02.jpg?${e.updated}` : null);
+  return (
+    <article className="work">
+      <div className="cover">
+        {cover ?? (
+          <button className="coverbtn" onClick={onCover} aria-label={`打开第 ${e.no} 期`}>
+            {src ? <img src={src} alt="" onError={(ev) => ((ev.target as HTMLImageElement).style.visibility = "hidden")} /> : null}
+            {!e.cover && <span className="covertag small">{e.scenes ? "未选封面" : "还没有画面"}</span>}
+          </button>
+        )}
+      </div>
+      <div className="meta">
+        <div className="small muted num">第 {e.no} 期</div>
+        <h2>{e.title}</h2>
+        {e.firstLine && <div className="small muted clip">{e.firstLine}</div>}
+        <div className="small muted num" style={{ marginTop: 4 }}>{info}</div>
+        <div className="acts">{actions}</div>
+      </div>
+    </article>
+  );
+};
+
 export const TodoPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
   const { toast } = useApp();
   const del = (e: Ep) => confirm(`删除第 ${e.no} 期「${e.title}」？会移到 episodes/.trash，可以手动找回。`) &&
     api(`episodes/${e.id}/delete`, {}).then(() => toast("已删除"));
+  const open = (e: Ep) => (location.hash = `work/${e.id}`);
   return (
     <>
-      <Title right={<a className="btn primary" href="#new" style={{ display: "inline-flex", alignItems: "center" }}>新建作品</a>}>进行中</Title>
+      <Title right={<a className="btn primary" href="#new" style={{ display: "inline-flex", alignItems: "center" }}>新建作品</a>}>进行中 <span className="muted small num">{eps.length}</span></Title>
       {eps.length === 0 ? <div className="empty">没有进行中的作品。<a className="link" href="#new">新建一个</a></div> : (
-        <table>
-          <thead><tr><th>作品</th><th>进度</th><th className="num">花费</th><th className="num">更新</th><th /></tr></thead>
-          <tbody>
-            {[...eps].sort((a, b) => b.updated - a.updated).map((e) => (
-              <tr key={e.id} className="click" onClick={() => (location.hash = `work/${e.id}`)}>
-                <td><span className="muted num">第 {e.no} 期</span>　{e.title}</td>
-                <td><Steps4 stage={e.stage} />　<span className="small">{STAGES[stageIndex(e.stage)][1]}</span></td>
-                <td className="num">{yuan(e.cost)}</td>
-                <td className="num muted">{ago(e.updated)}</td>
-                <td style={{ textAlign: "right" }}><button className="btn ghost" onClick={(ev) => { ev.stopPropagation(); del(e); }}>删除</button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="works">
+          {[...eps].sort((a, b) => b.updated - a.updated).map((e) => (
+            <WorkCard key={e.id} e={e} onCover={() => open(e)}
+              info={<><Steps4 stage={e.stage} /> {STAGES[stageIndex(e.stage)][1]} · {e.duration ? `${Math.round(e.duration)} 秒 · ` : ""}{yuan(e.cost)} · {ago(e.updated)}</>}
+              actions={<><button className="btn primary" onClick={() => open(e)}>继续{STAGES[stageIndex(e.stage)][1]}</button>
+                <button className="btn" onClick={() => del(e)}>删除</button></>} />
+          ))}
+        </div>
       )}
     </>
   );
@@ -82,26 +101,13 @@ export const LibraryPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
       {eps.length === 0 ? <div className="empty">还没有完结的作品。审片全部通过并渲染成片后，作品会出现在这里。</div> : (
         <div className="works">
           {sorted.map((e) => (
-            <article key={e.id} className="work">
-              <div className="cover">
-                {playing === e.id ? <video src={`/api/video/${e.id}`} controls autoPlay /> : (
-                  <button className="coverbtn" onClick={() => setPlaying(e.id)} aria-label={`播放第 ${e.no} 期`}>
-                    <img src={`/thumbs/${e.id}/s02.jpg?${e.updated}`} alt="" />
-                    <span className="playmark">▶</span>
-                  </button>
-                )}
-              </div>
-              <div className="meta">
-                <div className="small muted num">第 {e.no} 期</div>
-                <h2>{e.title}</h2>
-                <div className="small muted num">{e.duration ? `${Math.round(e.duration)} 秒` : "—"} · {yuan(e.cost)} · {e.doneAt ? ago(Date.parse(e.doneAt)) + "完结" : "已完结"}</div>
-                <div className="acts">
-                  {e.hd ? <a className="btn primary" href={`/api/video/${e.id}?hd=1&download=1`}>下载高清</a>
-                    : <button className="btn primary" disabled={exporting(e.id)} onClick={() => api(`episodes/${e.id}/export`, {}).then(() => toast("开始导出高清（2160×1620），约 5 分钟"))}>{exporting(e.id) ? "导出中…" : "导出高清"}</button>}
-                  <button className="btn" onClick={() => reopen(e)}>重新审片</button>
-                </div>
-              </div>
-            </article>
+            <WorkCard key={e.id} e={e} onCover={() => setPlaying(e.id)}
+              cover={playing === e.id ? <video src={`/api/video/${e.id}`} controls autoPlay /> : undefined}
+              info={<>{e.duration ? `${Math.round(e.duration)} 秒` : "—"} · {yuan(e.cost)} · {e.doneAt ? ago(Date.parse(e.doneAt)) + "完结" : "已完结"}</>}
+              actions={<>{e.hd ? <a className="btn primary" href={`/api/video/${e.id}?hd=1&download=1`}>下载高清</a>
+                : <button className="btn primary" disabled={exporting(e.id)} onClick={() => api(`episodes/${e.id}/export`, {}).then(() => toast("开始导出高清（2160×1620），约 5 分钟"))}>{exporting(e.id) ? "导出中…" : "导出高清"}</button>}
+                {e.cover && <a className="btn" href={e.cover} download>下载封面</a>}
+                <button className="btn" onClick={() => reopen(e)}>重新审片</button></>} />
           ))}
         </div>
       )}

@@ -8,7 +8,7 @@ import { STAGES, api, stageIndex, useApp, usePoll, yuan, type Job } from "./lib"
 
 type Round = { n: number; issue: string; summary: string; cost: number; at: string; undone?: boolean };
 type Scene = Omit<EpisodeJson["scenes"][number], "rounds"> & { updated?: boolean; voiceUpdated?: boolean; costWarn?: boolean; rounds: Round[] };
-type Ep = Omit<EpisodeJson, "scenes"> & { scenes: Scene[]; textRounds?: { issue: string; summary: string; at: string }[] };
+type Ep = Omit<EpisodeJson, "scenes"> & { scenes: Scene[]; textRounds?: { issue: string; summary: string; at: string }[]; covers?: { file: string; at: string }[]; cover?: string };
 
 const STATUS: Record<string, [string, string]> = {
   pending: ["待审", ""], queued: ["排队中", "warn"], working: ["AI 修改中", "warn"], approved: ["已通过", "pos"], asking: ["等你回复", "warn"], error: ["出错", "neg"],
@@ -36,7 +36,7 @@ export const WorkPage: React.FC<{ id: string; tab?: string }> = ({ id, tab }) =>
       {i === 0 && <TopicStep ep={ep} />}
       {i === 1 && <TextStep ep={ep} job={last("text")} />}
       {i === 2 && <GenStep ep={ep} job={last("gen")} />}
-      {i === 3 && <ReviewStep ep={ep} renderJob={last("render")} />}
+      {i === 3 && <ReviewStep ep={ep} renderJob={last("render")} coverJob={last("cover")} />}
     </>
   );
 };
@@ -121,7 +121,7 @@ const GenStep: React.FC<{ ep: Ep; job?: Job }> = ({ ep, job }) => {
   );
 };
 
-const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) => {
+const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job; coverJob?: Job }> = ({ ep, renderJob, coverJob }) => {
   const mod = EPISODES.find((m) => m.episode.id === ep.id);
   const [lib] = usePoll<{ bgm: string | null; mix: { bgm: number; sfx: Record<string, number> } }>("library", 30000);
   const bgm = lib?.bgm ? `/assets/audio/bgm/${encodeURIComponent(lib.bgm)}` : "/library/bgm_builtin.wav";
@@ -179,8 +179,8 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
             <span className="sp" />
             <button className="btn" disabled={rendering} onClick={() => api(`episodes/${ep.id}/render`, { draft: true })}>渲染草稿</button>
             {whole ? (
-              <button className="btn primary" disabled={rendering} onClick={() => confirm("整期通过？所有片标为通过，渲染成片后进入作品库。") &&
-                api(`episodes/${ep.id}/approve-all`, {})}>{rendering ? "渲染成片中…" : "整期通过，进作品库"}</button>
+              <button className="btn primary" disabled={rendering || !ep.cover} title={ep.cover ? "" : "先在下面选一张封面"} onClick={() => confirm("整期通过？所有片标为通过，渲染成片后进入作品库。") &&
+                api(`episodes/${ep.id}/approve-all`, {})}>{rendering ? "渲染成片中…" : ep.cover ? "整期通过，进作品库" : "先选封面"}</button>
             ) : (
               <button className="btn primary" disabled={ok < ep.scenes.length || rendering} onClick={() => api(`episodes/${ep.id}/render`, {})}>
                 {rendering ? "渲染中…" : "全部通过 · 渲染成片"}</button>
@@ -188,6 +188,8 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
           </div>
           {renderJob?.state === "error" && <div className="notice neg" style={{ marginBottom: 12 }}>渲染失败：{renderJob.result?.error}</div>}
           {rendering && whole && <div className="notice" style={{ marginBottom: 12 }}>正在渲染成片，大约 2～4 分钟，完成后自动进入作品库。</div>}
+
+          {whole && <CoverPicker ep={ep} job={coverJob} />}
 
           {!whole && <div className="card">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}><h2>{sc.id} {sc.name}</h2><span className={`pill ${cls}`}>{label}</span>
@@ -218,6 +220,37 @@ const ReviewStep: React.FC<{ ep: Ep; renderJob?: Job }> = ({ ep, renderJob }) =>
         </div>
       </div>
     </>
+  );
+};
+
+const CoverPicker: React.FC<{ ep: Ep; job?: Job }> = ({ ep, job }) => {
+  const { toast } = useApp();
+  const busy = running(job);
+  const all = ep.covers ?? [];
+  const batch = all.slice(-3);
+  const older = all.slice(0, -3);
+  const gen = () => api(`episodes/${ep.id}/covers`, {}).then(() => toast("开始生成 3 张封面，约 1 分钟，¥0.36"));
+  const Pick: React.FC<{ c: { file: string } }> = ({ c }) => (
+    <button className={ep.cover === c.file ? "on" : ""} onClick={() => api(`episodes/${ep.id}/cover`, { file: c.file }).then(() => toast("已选为封面"))} aria-label="选这张做封面">
+      <img src={`/covers/${ep.id}/${c.file}`} alt="" />{ep.cover === c.file && <span className="pill acc">当前封面</span>}
+    </button>
+  );
+  return (
+    <div className="card" style={{ marginBottom: "var(--gap)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <h2>封面</h2>{ep.cover ? <span className="pill pos">已选</span> : <span className="pill warn">还没选</span>}
+        <span className="sp" />
+        <button className="btn" disabled={busy} onClick={gen}>{busy ? (job?.progress ?? "排队中…") : all.length ? "重新生成 3 张" : "生成 3 张封面"}</button>
+      </div>
+      {job?.state === "error" && <div className="notice neg" style={{ marginTop: 12 }}>{job.result?.error ?? "封面没生成成功"}</div>}
+      {all.length === 0 ? <div className="small muted" style={{ marginTop: 8 }}>满版俯视房间风格，每张 ¥0.12。生成后点一张选为封面。</div> : (
+        <>
+          <div className="covers">{batch.map((c) => <Pick key={c.file} c={c} />)}</div>
+          {older.length > 0 && <details style={{ marginTop: 12 }}><summary className="small muted">之前生成的 {older.length} 张</summary>
+            <div className="covers">{older.map((c) => <Pick key={c.file} c={c} />)}</div></details>}
+        </>
+      )}
+    </div>
   );
 };
 

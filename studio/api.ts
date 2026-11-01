@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
 
-type Kind = "edit" | "undo" | "render" | "text" | "gen" | "apply";
+type Kind = "edit" | "undo" | "render" | "text" | "gen" | "apply" | "cover";
 type Job = { id: number; ep?: string; kind: Kind; scene?: string; arg?: string; state: "queued" | "running" | "done" | "error"; progress?: string; result?: unknown };
 
 const SHARED_COMPONENTS = [
@@ -121,6 +121,7 @@ export function studioApi(root: string): Plugin {
       return { id, no: e.no, title: e.title, stage: e.stage, cost: (e.cost?.tts ?? 0) + (e.cost?.image ?? 0), doneAt: e.doneAt,
         updated: fs.statSync(path.join(epDir(id), "episode.json")).mtimeMs, scenes: scenes.length,
         duration: readJson(path.join(epDir(id), "audio/timeline.json"), {}).duration ?? null,
+        cover: e.cover ? `/covers/${id}/${e.cover}` : null, firstLine: e.scenes?.[2]?.lines?.[0]?.zh?.replace(/[【】]/g, "") ?? "",
         video: fs.existsSync(P("out", id, `${id}.mp4`)), hd: fs.existsSync(P("out", id, `${id}-hd.mp4`)) };
     }),
     usage: usageSummary(),
@@ -226,6 +227,12 @@ export function studioApi(root: string): Plugin {
               e.scenes.forEach((s: Record<string, unknown>) => Object.assign(s, { status: "approved", updated: false, voiceUpdated: false }));
               writeEp(id, e);
               return enqueue({ ep: id, kind: "render", arg: "" }), send(200, { ok: true });
+            }
+            if (POST && act === "covers") return enqueue({ ep: id, kind: "cover" }), send(200, { ok: true });
+            if (POST && act === "cover") {
+              const e = readEp(id);
+              if (!(e.covers ?? []).some((c: { file: string }) => c.file === data.file)) return send(400, { error: "没有这张封面" });
+              return patchEp(id, { cover: data.file }), send(200, { ok: true });
             }
             if (POST && act === "export") return enqueue({ ep: id, kind: "render", arg: "hd" }), send(200, { ok: true });
             if (POST && act === "render") return enqueue({ ep: id, kind: "render", arg: data.draft ? "draft" : "" }), send(200, { ok: true });
