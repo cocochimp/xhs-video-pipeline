@@ -166,8 +166,6 @@ export const NewPage: React.FC = () => {
 export const LibraryPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
   const { toast } = useApp();
   const [playing, setPlaying] = useState("");
-  const [jobs] = usePoll<{ ep?: string; kind: string; state: string; arg?: string }[]>("jobs", 3000);
-  const exporting = (id: string) => jobs?.some((j) => j.ep === id && j.kind === "render" && j.arg === "hd" && (j.state === "queued" || j.state === "running"));
   const reopen = (e: Ep) => api(`episodes/${e.id}/reopen`, {}).then(() => { toast("已拉回审片台"); location.hash = `work/${e.id}/review`; });
   const sorted = [...eps].sort((x, y) => y.no - x.no);
   return (
@@ -177,11 +175,9 @@ export const LibraryPage: React.FC<{ eps: Ep[] }> = ({ eps }) => {
         <div className="works">
           {sorted.map((e) => (
             <WorkCard key={e.id} e={e} onCover={() => setPlaying(e.id)}
-              cover={playing === e.id ? <video src={`/api/video/${e.id}`} controls autoPlay /> : undefined}
+              cover={playing === e.id && e.video ? <video src={`/api/video/${e.id}`} controls autoPlay /> : undefined}
               info={<>{e.duration ? `${Math.round(e.duration)} 秒` : "—"} · {yuan(e.cost)} · {e.doneAt ? ago(Date.parse(e.doneAt)) + "完结" : "已完结"}</>}
-              actions={<>{e.hd ? <a className="btn primary" href={`/api/video/${e.id}?hd=1&download=1`}>下载高清</a>
-                : <button className="btn primary" disabled={exporting(e.id)} onClick={() => api(`episodes/${e.id}/export`, {}).then(() => toast("开始导出高清（2160×1620），约 5 分钟"))}>{exporting(e.id) ? "导出中…" : "导出高清"}</button>}
-                {e.cover && <a className="btn" href={`/api/cover/${e.id}`}>下载封面</a>}
+              actions={<><button className="btn primary" onClick={() => api(`episodes/${e.id}/open`, {})}>打开目录</button>
                 <button className="btn" onClick={() => reopen(e)}>重新审片</button></>} />
           ))}
         </div>

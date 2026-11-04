@@ -53,15 +53,31 @@ def render(ep_dir: Path, draft: bool = False, hd: bool = False) -> Path:
     out.mkdir(parents=True, exist_ok=True)
     sync(ROOT)
     raw = out / f"{eid}_raw.mp4"
+    hd = hd or not draft  # 成片一律高清（2160×1620）
     extra = ["--scale=1.5", "--crf=16"] if hd else []
     subprocess.run(["npx", "remotion", "render", "shared/index.ts", eid, str(raw), "--log=error", *extra], cwd=ROOT, check=True)
-    final = out / f"{eid}{'-draft' if draft else '-hd' if hd else ''}.mp4"
+    final = out / f"{eid}{'-draft' if draft else ''}.mp4"
     subprocess.run([sys.executable, str(ROOT / "opening/make_audio.py"), str(raw), str(final),
                     str(ep_dir / "audio/timeline.json")], check=True)
+    if not draft:
+        publish(ep_dir, episode)
     return final
 
 
+def publish(ep_dir: Path, episode: dict) -> None:
+    """成片和封面放进 output/：ep001.mp4、ep001.jpg（发布时直接从这里拿）。"""
+    import shutil
+    dst = ROOT / "output"
+    dst.mkdir(exist_ok=True)
+    eid = episode["id"]
+    shutil.copy2(ROOT / "out" / eid / f"{eid}.mp4", dst / f"{eid}.mp4")
+    if episode.get("cover") and (ep_dir / "covers" / episode["cover"]).exists():
+        shutil.copy2(ep_dir / "covers" / episode["cover"], dst / f"{eid}.jpg")
+
+
 if __name__ == "__main__":
+    import pipeline
+    pipeline.load_env()  # 配音过期时要重配，需要密钥
     ap = argparse.ArgumentParser()
     ap.add_argument("episode", type=Path)
     ap.add_argument("--draft", action="store_true")

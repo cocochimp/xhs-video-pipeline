@@ -2,7 +2,7 @@
   "id": "ep002",
   "no": 2,
   "total": 100,
-  "stage": "text",
+  "stage": "done",
   "title": "FIRE计划是什么？2分钟讲清",
   "segments": [
     {
@@ -69,8 +69,10 @@
           "vol": 0.8
         }
       ],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [],
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s02",
@@ -85,12 +87,23 @@
         {
           "seg": "title",
           "zh": "FIRE计划是什么？2分钟讲清",
-          "say": "FIRE计划是什么？两分钟讲清。"
+          "say": "fire计划是什么？两分钟讲清。"
         }
       ],
       "sfx": [],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [
+        {
+          "n": 1,
+          "issue": "这里语音不应该分别读字母FIRE，而是读一整个英语单词",
+          "summary": "把本片 say 里的「FIRE」改为小写「fire」，让语音按整个英文单词朗读，字幕不变。",
+          "cost": 0.0048,
+          "at": "2026-11-01T22:20:21"
+        }
+      ],
+      "costWarn": false,
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s03",
@@ -119,8 +132,19 @@
         }
       ],
       "sfx": [],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [
+        {
+          "n": 1,
+          "issue": "FIRE出现在了裁员那朵云朵的上面，重叠了，把FIRE移动到屏幕中间",
+          "summary": "把「FIRE」大字从乌云位置 (760,190) 移到屏幕正中 (720,540)，不再和「裁员」乌云重叠",
+          "cost": 0,
+          "at": "2026-11-01T22:23:08"
+        }
+      ],
+      "updated": false,
+      "voiceUpdated": false,
+      "costWarn": false
     },
     {
       "id": "s04",
@@ -144,8 +168,19 @@
         }
       ],
       "sfx": [],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [
+        {
+          "n": 1,
+          "issue": "FIRE中间在切断之前为什么有一条线分开？没有美感，优化一下",
+          "summary": "FIRE卡片裂开前去掉两半中间相接的边框，看起来是一整张卡片，裂开后才显示各自的切口边",
+          "cost": 0,
+          "at": "2026-11-01T22:24:28"
+        }
+      ],
+      "costWarn": false,
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s05",
@@ -169,8 +204,10 @@
         }
       ],
       "sfx": [],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [],
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s06",
@@ -194,8 +231,10 @@
         }
       ],
       "sfx": [],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [],
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s07",
@@ -225,8 +264,10 @@
           "vol": 1
         }
       ],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [],
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s08",
@@ -250,8 +291,10 @@
         }
       ],
       "sfx": [],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [],
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s09",
@@ -275,8 +318,10 @@
         }
       ],
       "sfx": [],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [],
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s10",
@@ -300,8 +345,10 @@
         }
       ],
       "sfx": [],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [],
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s11",
@@ -325,8 +372,10 @@
         }
       ],
       "sfx": [],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [],
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s12",
@@ -350,8 +399,10 @@
         }
       ],
       "sfx": [],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [],
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s13",
@@ -381,8 +432,10 @@
           "vol": 0.8
         }
       ],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [],
+      "updated": false,
+      "voiceUpdated": false
     },
     {
       "id": "s14",
@@ -407,13 +460,24 @@
           "vol": 0.6
         }
       ],
-      "status": "pending",
-      "rounds": []
+      "status": "approved",
+      "rounds": [
+        {
+          "n": 1,
+          "issue": "最后这个结尾一定不要出现举牌字的组件，后续的结尾也要统一成思考",
+          "summary": "s14 前半段的举牌姿势换成思考姿势，「你的25倍是多少？」移到右侧卡片（25倍标橙），后半段挥手和头像不变。",
+          "cost": 0,
+          "at": "2026-11-01T22:28:36"
+        }
+      ],
+      "costWarn": false,
+      "updated": false,
+      "voiceUpdated": false
     }
   ],
   "cost": {
-    "tts": 0.0858,
-    "image": 0.24
+    "tts": 0.2454,
+    "image": 0.6
   },
   "textRounds": [
     {
@@ -426,5 +490,22 @@
       "summary": "第2期改写为14个分镜：从月光、怕被裁讲起，再拆开 FIRE、讲一年开销的25倍、少花/多存/让钱干活三件事，最后让观众记一个月账；say 约510字、全片约1分50秒、音效6个；JSON 校验命令没获批，没跑。",
       "at": "2026-11-01T13:25:16"
     }
-  ]
+  ],
+  "covers": [
+    {
+      "file": "c1101223100_1.jpg",
+      "at": "2026-11-01T22:31:13"
+    },
+    {
+      "file": "c1101223100_2.jpg",
+      "at": "2026-11-01T22:31:25"
+    },
+    {
+      "file": "c1101223100_3.jpg",
+      "at": "2026-11-01T22:31:36"
+    }
+  ],
+  "cover": "c1101223100_2.jpg",
+  "doneAt": "2026-11-01T14:39:39.489Z",
+  "pace": {}
 }

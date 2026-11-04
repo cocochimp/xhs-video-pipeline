@@ -20,7 +20,7 @@ export function usePoll<T>(p: string | null, ms = 2000): [T | null, () => void] 
 }
 
 export type Overview = {
-  episodes: { id: string; no: number; title: string; stage: string; cost: number; updated: number; scenes: number; video: boolean; hd: boolean; duration: number | null; doneAt?: string; cover: string | null; firstLine: string }[];
+  episodes: { id: string; no: number; title: string; stage: string; cost: number; updated: number; scenes: number; video: boolean; duration: number | null; doneAt?: string; cover: string | null; firstLine: string }[];
   usage: { aiMonthUsd: number; aiTotalUsd: number; packyUsd: number | null } | null;
 };
 export type Job = { id: number; ep?: string; kind: string; scene?: string; state: string; progress?: string; result?: { ok?: boolean; error?: string; summary?: string } };

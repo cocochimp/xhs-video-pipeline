@@ -162,7 +162,7 @@ export function studioApi(root: string): Plugin {
         updated: fs.statSync(path.join(epDir(id), "episode.json")).mtimeMs, scenes: scenes.length,
         duration: readJson(path.join(epDir(id), "audio/timeline.json"), {}).duration ?? null,
         cover: e.cover ? `/covers/${id}/${e.cover}` : null, firstLine: e.scenes?.[2]?.lines?.[0]?.zh?.replace(/[【】]/g, "") ?? "",
-        video: fs.existsSync(P("out", id, `${id}.mp4`)), hd: fs.existsSync(P("out", id, `${id}-hd.mp4`)) };
+        video: fs.existsSync(P("output", `${id}.mp4`)) };
     }),
     usage: usageSummary(),
   });
@@ -217,7 +217,7 @@ export function studioApi(root: string): Plugin {
               return void fs.createReadStream(file).pipe(res);
             }
             if (GET && u[0] === "video") {
-              const name = `${u[1]}${q.get("hd") ? "-hd" : ""}.mp4`, file = P("out", u[1], name);
+              const name = `${u[1]}.mp4`, file = P("output", name);
               if (!/^ep\d+$/.test(u[1] ?? "") || !fs.existsSync(file)) return send(404, { error: "还没有这个视频" });
               if (q.get("download")) res.setHeader("content-disposition", `attachment; filename="${u[1]}.mp4"`); // 下载统一叫 ep001.mp4
               return sendFile(res, file, req.headers.range);
@@ -281,9 +281,15 @@ export function studioApi(root: string): Plugin {
             if (POST && act === "cover") {
               const e = readEp(id);
               if (!(e.covers ?? []).some((c: { file: string }) => c.file === data.file)) return send(400, { error: "没有这张封面" });
-              return patchEp(id, { cover: data.file }), send(200, { ok: true });
+              patchEp(id, { cover: data.file });
+              if (fs.existsSync(P("output", `${id}.mp4`))) fs.copyFileSync(path.join(epDir(id), "covers", data.file), P("output", `${id}.jpg`)); // 已完结的同步换封面
+              return send(200, { ok: true });
             }
-            if (POST && act === "export") return enqueue({ ep: id, kind: "render", arg: "hd" }), send(200, { ok: true });
+            if (POST && act === "open") { // 在访达里打开 output/ 并选中这一期的视频
+              const f = P("output", `${id}.mp4`);
+              spawn("open", fs.existsSync(f) ? ["-R", f] : [P("output")]);
+              return send(200, { ok: true });
+            }
             if (POST && act === "render") return enqueue({ ep: id, kind: "render", arg: data.draft ? "draft" : "" }), send(200, { ok: true });
             if (POST && sact === "edit") {
               if (!data.issue?.trim()) return send(400, { error: "问题不能为空" });
