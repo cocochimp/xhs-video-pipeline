@@ -17,7 +17,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tools.audio_timeline import TAIL, layout, segment_hash, segment_speech  # noqa: E402
+from tools.audio_timeline import TAIL, layout, pace_cuts, pace_plan, pace_tag, segment_hash, segment_speech, shift_words  # noqa: E402
 from tools.sync_public import sync  # noqa: E402
 
 PRICE = 0.0003  # 豆包语音合成 2.0，元/字（标点也算字）
@@ -43,6 +43,22 @@ def detect_silences(mp3: Path) -> list[list[float]]:
     return out
 
 
+def splice(raw: Path, out: Path, cuts: list[tuple[float, float]]) -> None:
+    """在切点插入静音：句子之间多停一下。"""
+    import imageio_ffmpeg
+    edges = [0.0] + [t for t, _ in cuts] + [None]
+    parts, labels = [], []
+    for k in range(len(edges) - 1):
+        a, b = edges[k], edges[k + 1]
+        trim = f"atrim=start={a:.3f}" + (f":end={b:.3f}" if b is not None else "")
+        pad = f",apad=pad_dur={cuts[k][1]:.3f}" if k < len(cuts) else ""
+        parts.append(f"[0:a]{trim},asetpts=PTS-STARTPTS{pad}[p{k}]")
+        labels.append(f"[p{k}]")
+    graph = ";".join(parts) + ";" + "".join(labels) + f"concat=n={len(labels)}:v=0:a=1[o]"
+    subprocess.run([imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(raw), "-filter_complex", graph,
+                    "-map", "[o]", "-c:a", "libmp3lame", "-q:a", "3", str(out)], check=True)
+
+
 def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = None, sync_root: Path | None = ROOT,
           detect=detect_silences):
     """返回 (timeline, 本次计费字数, 本次实际合成的段名列表)。"""
@@ -57,18 +73,25 @@ def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = No
     # 先用假音频走一遍排版，音效越界、空台词等错误在计费前暴露
     layout(episode, {seg: {"duration": 1.0, "words": [], "hash": ""} for seg in speech}, voice)
     seg_audio, billed, revoiced = {}, 0, []
-    rates = {s["id"]: s["rate"] for s in episode["segments"] if "rate" in s}  # 某段单独调语速（如开头）
+    rates = {s["id"]: s["rate"] for s in episode["segments"] if "rate" in s}
+    plans = pace_plan(episode)  # 某段单独调语速（如开头）
     try:
         for seg, text in speech.items():
             rate = rates.get(seg, voice["rate"])
-            key = segment_hash(voice["speaker"], rate, text)
+            key = segment_hash(voice["speaker"], rate, text + pace_tag(plans.get(seg)))
             wfile, mp3 = audio / f"words_{seg}_{key}.json", audio / f"vo_{seg}_{key}.mp3"
             cached = json.loads(wfile.read_text()) if wfile.exists() and mp3.exists() else None
             if force or not cached or cached["hash"] != key:
                 wfile.unlink(missing_ok=True)  # 合成失败时不能留下与新 mp3 不配套的旧缓存
-                words = synth(text, mp3, speaker=voice["speaker"], speech_rate=rate)
+                raw = audio / f"raw_{seg}_{key}.mp3" if plans.get(seg) else mp3
+                words = synth(text, raw, speaker=voice["speaker"], speech_rate=rate)
                 if not words:
                     raise RuntimeError(f"配音段 {seg} 没有返回逐字时间")
+                if plans.get(seg):  # 句间、换片多停一下
+                    cuts = pace_cuts(text, words, plans[seg])
+                    splice(raw, mp3, cuts)
+                    words = shift_words(words, cuts)
+                    raw.unlink(missing_ok=True)
                 cached = {"hash": key, "words": [list(w) for w in words]}
                 wfile.write_text(json.dumps(cached, ensure_ascii=False))
                 billed += len(text)

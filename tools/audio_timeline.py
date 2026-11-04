@@ -75,6 +75,51 @@ def segment_speech(episode: dict) -> dict[str, str]:
     return {s: speech[s] for s in appeared}
 
 
+def pace_plan(episode: dict) -> dict[str, list[tuple[int, float]]]:
+    """配音节奏：episode["pace"] = {"line": 句间加停秒数, "scene": 换片加停秒数}。
+    返回 {段名: [(这一句的字数, 之后加停多少秒), ...]}，每段最后一句不加。没有 pace 返回 {}。"""
+    pace = episode.get("pace") if "pace" in episode else default_pace()
+    pace = pace or {}
+    if not (pace.get("line") or pace.get("scene")):
+        return {}
+    flat = [(sc["id"], ln) for sc in episode["scenes"] for ln in sc["lines"]]
+    plan: dict[str, list] = {}
+    for k, (sid, ln) in enumerate(flat):
+        nxt = flat[k + 1] if k + 1 < len(flat) else None
+        if not nxt or nxt[1]["seg"] != ln["seg"]:
+            continue
+        p = pace.get("scene", 0) if nxt[0] != sid else pace.get("line", 0)
+        cum = sum(len(norm(x["say"])) for _, x in flat[:k + 1] if x["seg"] == ln["seg"])
+        plan.setdefault(ln["seg"], []).append((cum, round(float(p), 3)))
+    return plan
+
+
+def default_pace() -> dict:
+    """全局节奏：studio/config.json 的 pace（每期可在 episode.json 里写 pace 覆盖）。"""
+    import json
+    from pathlib import Path
+    cfg = Path(__file__).resolve().parent.parent / "studio/config.json"
+    return (json.loads(cfg.read_text()).get("pace") if cfg.exists() else None) or {}
+
+
+def pace_tag(plan: list | None) -> str:
+    return ("|pace:" + ",".join(f"{c}:{p}" for c, p in plan)) if plan else ""
+
+
+def pace_cuts(speech: str, words, plan: list) -> list[tuple[float, float]]:
+    """在每句结尾和下一句开头之间切开，返回 [(切点秒, 加停秒), ...]。"""
+    st, en = char_times(speech, words)
+    return [((en[c - 1] + st[c]) / 2, p) for c, p in plan if 0 < c < len(st) and p > 0]
+
+
+def shift_words(words, cuts) -> list[tuple[float, float, str]]:
+    out = []
+    for s, e, w in words:
+        d = sum(p for t, p in cuts if t <= s)
+        out.append((round(s + d, 3), round(e + d, 3), w))
+    return out
+
+
 def segment_hash(speaker: str, rate: int, speech: str) -> str:
     return hashlib.sha1(f"{speaker}|{rate}|{speech}".encode()).hexdigest()[:12]
 

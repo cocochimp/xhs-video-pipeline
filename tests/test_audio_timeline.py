@@ -1,6 +1,6 @@
 import pytest
 
-from tests.helpers import fake_seg_audio, make_episode
+from tests.helpers import fake_seg_audio, make_episode, words_for
 from tools.audio_timeline import char_times, layout, segment_hash, segment_speech
 
 VOICE = {"speaker": "x", "rate": 15}
@@ -142,3 +142,18 @@ def test_limit_sfx_caps_density():
     ev = [[0.0, "pop", 1], [0.5, "pop", 1], [2.0, "whoosh", 1]] + [[2.0 + 2 * i, "pop", 1] for i in range(1, 8)]
     kept = limit_sfx(ev)
     assert [k[0] for k in kept] == [0.0, 4.0, 6.0, 8.0]   # 0.5 太近、whoosh 停用、pop 最多 4 个
+
+
+def test_pace_plan_and_shift():
+    from tools.audio_timeline import pace_cuts, pace_plan, pace_tag, shift_words
+    ep = make_episode()
+    ep["pace"] = {}
+    assert pace_plan(ep) == {}
+    ep["pace"] = {"line": 0.3, "scene": 0.6}
+    plan = pace_plan(ep)
+    assert plan == {"open": [(2, 0.6)], "body": [(2, 0.3)]}   # 开场→这期 换片；一二→三 同片
+    assert pace_tag(plan["body"]) == "|pace:2:0.3"
+    w = words_for("一二，三。")
+    cuts = pace_cuts("一二，三。", w, plan["body"])
+    assert cuts == [(pytest.approx(0.4), 0.3)]
+    assert [x[0] for x in shift_words(w, cuts)] == [0.0, 0.2, pytest.approx(0.7)]

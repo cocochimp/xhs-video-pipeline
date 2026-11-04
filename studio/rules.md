@@ -9,6 +9,9 @@
 
 其他文件一律不改（其他场景、`shared/`、已有素材、全局配置）。越界会被自动还原。
 
+## 标准
+先读 `docs/口播与审核标准.md`，改动必须符合里面的口播节奏、语气、画面规则。
+
 ## 写法
 - 场景组件 `({ at, dur }) => ...`：`at(i)` 是本片第 i 句开始的帧，`at(台词数) = dur`。不写绝对秒数。30 帧/秒，画布 1440×1080。
 - 组件从 `../../../shared/ui` 引入：`Pose name x bottom h at sign`、`Sticker src x y h at rot`、`Card x y at size fill color tilt`、`BigText x y at size color slam`、`Check`、`Strike`；颜色从 `../../../shared/theme` 引入 `INK ORANGE`。

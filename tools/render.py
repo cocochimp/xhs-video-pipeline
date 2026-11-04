@@ -13,7 +13,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from tools.audio_timeline import segment_hash, segment_speech  # noqa: E402
+from tools.audio_timeline import pace_plan, pace_tag, segment_hash, segment_speech  # noqa: E402
 from tools.sync_public import sync  # noqa: E402
 
 
@@ -25,7 +25,7 @@ def check_timeline(episode: dict, timeline: dict, voice: dict, dir_name: str) ->
     for seg, text in segment_speech(episode).items():
         have = timeline.get("segments", {}).get(seg, {}).get("hash")
         rate = next((g.get("rate", voice["rate"]) for g in episode["segments"] if g["id"] == seg), voice["rate"])
-        if have != segment_hash(voice["speaker"], rate, text):
+        if have != segment_hash(voice["speaker"], rate, text + pace_tag(pace_plan(episode).get(seg))):
             stale.append(f"配音段 {seg}")
     want = [(sc["id"], i, ln["zh"]) for sc in episode["scenes"] for i, ln in enumerate(sc["lines"])]
     got = [(ln["scene"], ln["i"], ln["zh"]) for ln in timeline.get("lines", [])]

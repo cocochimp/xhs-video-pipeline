@@ -47,6 +47,40 @@ def check_text(ep: dict, before: dict) -> str:
     return ""
 
 
+def cn(n: int) -> str:
+    """1～999 → 汉字（朗读用）"""
+    d = "零一二三四五六七八九"
+    if n < 10:
+        return d[n]
+    if n < 100:
+        return ("" if n // 10 == 1 else d[n // 10]) + "十" + (d[n % 10] if n % 10 else "")
+    rest = n % 100
+    return d[n // 100] + "百" + ("" if not rest else ("零" + d[rest] if rest < 10 else cn(rest) if rest >= 20 else "一" + cn(rest)))
+
+
+STANDARD = "docs/口播与审核标准.md"
+
+
+def self_review(ep_dir: Path, code: bool, rounds: int = 2) -> list[str]:
+    """按全局审核标准自查；有问题就交给 AI 修，最多 rounds 轮。返回修完还剩的问题。"""
+    from studio.review import review
+    rel = ep_dir.relative_to(ROOT)
+    left = review(ep_dir, code=code)
+    for k in range(rounds):
+        if not left:
+            break
+        log(f"自查发现 {len(left)} 个问题，AI 修正（第 {k + 1} 轮）")
+        claude("\n\n".join([
+            f"按 {STANDARD} 修正 {rel} 里的这些问题。先读这份标准。",
+            "问题：\n- " + "\n- ".join(left),
+            f"可以改 {rel}/episode.json 的 scenes（lines、visual、sfx）" + (f"和 {rel}/scenes/*.tsx" if code else "") + "，其他字段和文件不动。",
+            "拆句或合句会改变台词数量：同步检查场景代码里的 at(i) 和 sfx.line 不越界。" if code else "",
+            '最后一行输出 {"summary": "<一句话>"}',
+        ]), "review", tools=["Read", "Edit", "Write", "Glob", "Grep"] + (["Bash(npx tsc:*)"] if code else []), timeout=900)
+        left = review(ep_dir, code=code)
+    return left
+
+
 def cmd_text(ep_dir: Path, issue: str = "") -> dict:
     ep_dir = ep_dir.resolve()
     before = load(ep_dir)
@@ -65,8 +99,9 @@ def cmd_text(ep_dir: Path, issue: str = "") -> dict:
         "正文结构：痛点 → 要点（清单 / 对比 / 算一笔账）→ 结论 + 一个能照做的动作；量化不要多，每期最多一个核心数字；"
         "内容要有普适性，从打工人日常（加班、跳槽、月光、被裁、攒不下钱）讲起，不要硬扯到退休计算；"
         "固定开头：s01 两句，第一句 zh「普通人，要如何才能【提前退休】？」say「普通人要如何才能提前退休，」(seg=open)，"
-        f"第二句 zh「这里是阿牛退休计划，第{before['no']}期」say「这里是阿牛退休计划第{before['no']}期！」(seg=open)；s02 第一句「本期我们要讲的是：」(seg=open)，第二句是选题 (seg=title)；"
-        "正文 seg=body；最后一句固定为「关注阿牛，一起早日退休！」(seg=end)。结尾分镜的阿牛用思考姿势（think），不要举牌。"
+        f"第二句 zh「这里是阿牛退休计划，第{before['no']}期」say「这里是阿牛退休计划第{cn(before['no'])}期！」(seg=open)；s02 第一句「本期我们要讲的是：」(seg=open)，第二句是选题 (seg=title)；"
+        f"先读 {STANDARD}，全部按里面的口播节奏、语气、画面规则写。"
+        "正文 seg=body；最后一句固定为「关注阿牛，一起早日退休！」(seg=end)，end 段只有这一句，结尾的互动提问放在它前面、用 seg=body、用阿牛跟朋友聊天的口吻。结尾分镜的阿牛用思考姿势（think），不要举牌。"
         "每句 lines 有 seg、zh（字幕，重点词用【】标橙）、say（朗读，数字写汉字）；每个分镜有 id(s01…)、name、visual（画面描述）、"
         "sfx（[{line, kind: pop|stamp, vol}]，每分钟最多 8 个，pop 每分钟最多 4 个、stamp 每分钟最多 3 个，两个至少隔 1.5 秒，只放在最关键的数字或结论上）、status: pending、rounds: []。roll.topics 放 11 个别的选题，roll.dur 2.2。",
         "s01、s02 的 visual 和 sfx 照抄第 1 期。只改 scenes、roll、title 字段，其他字段保持原样。参考第 1 期的写法：\n" + example,
@@ -85,10 +120,12 @@ def cmd_text(ep_dir: Path, issue: str = "") -> dict:
         write_episode(ep_dir, before)
         return {"ok": False, "error": err}
     out = last_json(text) or {}
+    left = self_review(ep_dir, code=False)
+    ep = load(ep_dir)
     ep.setdefault("textRounds", []).append({"issue": issue or "初稿", "summary": out.get("summary", ""),
                                             "at": datetime.now().isoformat(timespec="seconds")})
     write_episode(ep_dir, ep)
-    return {"ok": True, "summary": out.get("summary", "")}
+    return {"ok": True, "summary": out.get("summary", "") + (f"（自查还剩 {len(left)} 个问题：{'；'.join(left[:3])}）" if left else "")}
 
 
 def register_episodes() -> None:
@@ -141,6 +178,12 @@ def cmd_gen(ep_dir: Path) -> dict:
             break
     if error:
         return {"ok": False, "error": "类型检查没通过：" + error[-300:]}
+    left = self_review(ep_dir, code=True)
+    if left:
+        log("自查后还剩：" + "；".join(left[:3]))
+    from tools.build_audio import build as rebuild
+    rebuild(ep_dir)  # 自查可能改了台词：只重配变了的段
+    register_episodes()
     for sc in ep["scenes"]:
         log(f"缩略图 {sc['id']}")
         thumb(ep_dir, sc["id"])
@@ -294,6 +337,22 @@ def fill_angles(db: dict) -> dict:
     return {"ok": n > 0, "filled": n, **({} if n else {"error": "AI 没给出方向"})}
 
 
+def cmd_fix(ep_dir: Path) -> dict:
+    """对已生成的一期按全局标准自查自修：文本 + 分镜代码，然后重配变了的段、刷新缩略图。"""
+    from studio.edit import thumb
+    from tools.build_audio import build
+    ep_dir = ep_dir.resolve()
+    left = self_review(ep_dir, code=True)
+    r = subprocess.run(["npx", "tsc", "-p", "."], cwd=ROOT, capture_output=True, text=True)
+    if r.returncode:
+        return {"ok": False, "error": "类型检查没通过：" + (r.stdout + r.stderr)[-300:]}
+    log("重配变了的段")
+    build(ep_dir)
+    for sc in load(ep_dir)["scenes"]:
+        thumb(ep_dir, sc["id"])
+    return {"ok": True, "left": left}
+
+
 def cmd_voice(speaker: str, rate: int) -> dict:
     """试听一个音色，按 音色+语速 缓存。约 0.01 元。"""
     import hashlib
@@ -311,12 +370,12 @@ def cmd_voice(speaker: str, rate: int) -> dict:
 
 def main():
     cmd, a = sys.argv[1], sys.argv[2:]
-    if cmd in ("text", "gen", "voice", "cover"):
+    if cmd in ("text", "gen", "voice", "cover", "fix"):
         import pipeline
         pipeline.load_env()
     res = {"text": lambda: cmd_text(Path(a[0]), a[1] if len(a) > 1 else ""), "gen": lambda: cmd_gen(Path(a[0])),
            "chat": lambda: cmd_chat(*a[:3]), "apply": lambda: cmd_apply(a[0]), "previews": cmd_previews,
-           "voice": lambda: cmd_voice(a[0], int(a[1])), "cover": lambda: cmd_cover(Path(a[0])), "topics": lambda: cmd_topics(a[0]), "register": lambda: register_episodes() or {"ok": True}}[cmd]()
+           "voice": lambda: cmd_voice(a[0], int(a[1])), "cover": lambda: cmd_cover(Path(a[0])), "topics": lambda: cmd_topics(a[0]), "fix": lambda: cmd_fix(Path(a[0])), "register": lambda: register_episodes() or {"ok": True}}[cmd]()
     print(json.dumps(res, ensure_ascii=False))
     sys.exit(0 if res.get("ok") else 1)
 

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Plugin } from "vite";
 
-type Kind = "edit" | "undo" | "render" | "text" | "gen" | "apply" | "cover" | "topics";
+type Kind = "edit" | "undo" | "render" | "text" | "gen" | "apply" | "cover" | "topics" | "fix";
 type Job = { id: number; ep?: string; kind: Kind; scene?: string; arg?: string; state: "queued" | "running" | "done" | "error"; progress?: string; result?: unknown };
 
 const SHARED_COMPONENTS = [
@@ -276,6 +276,7 @@ export function studioApi(root: string): Plugin {
               writeEp(id, e);
               return enqueue({ ep: id, kind: "render", arg: "" }), send(200, { ok: true });
             }
+            if (POST && act === "fix") return enqueue({ ep: id, kind: "fix" }), send(200, { ok: true });
             if (POST && act === "covers") return enqueue({ ep: id, kind: "cover" }), send(200, { ok: true });
             if (POST && act === "cover") {
               const e = readEp(id);

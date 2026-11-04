@@ -19,6 +19,7 @@ _EP = {
          "sfx": [{"line": 1, "kind": "stamp", "vol": 1.0, "offset": -0.1}]},
     ],
     "cost": {"tts": 0, "image": 0},
+    "pace": {},  # 测试不加停顿
 }
 
 
