@@ -83,18 +83,23 @@ def build(ep_dir: Path, force: bool = False, synth=None, voice: dict | None = No
             cached = json.loads(wfile.read_text()) if wfile.exists() and mp3.exists() else None
             if force or not cached or cached["hash"] != key:
                 wfile.unlink(missing_ok=True)  # 合成失败时不能留下与新 mp3 不配套的旧缓存
-                raw = audio / f"raw_{seg}_{key}.mp3" if plans.get(seg) else mp3
-                words = synth(text, raw, speaker=voice["speaker"], speech_rate=rate)
-                if not words:
-                    raise RuntimeError(f"配音段 {seg} 没有返回逐字时间")
-                if plans.get(seg):  # 句间、换片多停一下
-                    cuts = pace_cuts(text, words, plans[seg])
+                rawkey = segment_hash(voice["speaker"], rate, text)
+                raw, rawj = audio / f"raw_{seg}_{rawkey}.mp3", audio / f"raw_{seg}_{rawkey}.json"
+                if plans.get(seg) and raw.exists() and rawj.exists() and not force:  # 只改停顿：用留着的原始配音，不花钱
+                    words = [tuple(w) for w in json.loads(rawj.read_text())["words"]]
+                else:
+                    words = synth(text, raw if plans.get(seg) else mp3, speaker=voice["speaker"], speech_rate=rate)
+                    if not words:
+                        raise RuntimeError(f"配音段 {seg} 没有返回逐字时间")
+                    billed += len(text)
+                    if plans.get(seg):
+                        rawj.write_text(json.dumps({"words": [list(w) for w in words]}, ensure_ascii=False))
+                if plans.get(seg):  # 句间、换片多停一下，只在真正的静音里加
+                    cuts = pace_cuts(text, words, plans[seg], detect(raw))
                     splice(raw, mp3, cuts)
                     words = shift_words(words, cuts)
-                    raw.unlink(missing_ok=True)
                 cached = {"hash": key, "words": [list(w) for w in words]}
                 wfile.write_text(json.dumps(cached, ensure_ascii=False))
-                billed += len(text)
                 revoiced.append(seg)
                 print(f"  配音 {seg}：{len(text)} 字")
             if "silences" not in cached:

@@ -106,10 +106,20 @@ def pace_tag(plan: list | None) -> str:
     return ("|pace:" + ",".join(f"{c}:{p}" for c, p in plan)) if plan else ""
 
 
-def pace_cuts(speech: str, words, plan: list) -> list[tuple[float, float]]:
-    """在每句结尾和下一句开头之间切开，返回 [(切点秒, 加停秒), ...]。"""
+def pace_cuts(speech: str, words, plan: list, silences=()) -> list[tuple[float, float]]:
+    """只在句子之间真正的静音里切开加停，返回 [(切点秒, 加停秒), ...]。
+    TTS 时间戳常比声音早，按时间戳切会切到上一个字的尾音（听起来像卡顿），所以句子边界附近没有静音就不加。"""
     st, en = char_times(speech, words)
-    return [((en[c - 1] + st[c]) / 2, p) for c, p in plan if 0 < c < len(st) and p > 0]
+    cuts = []
+    for c, p in plan:
+        if not (0 < c < len(st) and p > 0):
+            continue
+        b = (en[c - 1] + st[c]) / 2
+        near = [(s, e) for s, e in silences if s - 0.25 <= b <= e + 0.25 and e - s >= 0.08]
+        if near:
+            s, e = min(near, key=lambda x: abs((x[0] + x[1]) / 2 - b))
+            cuts.append((round((s + e) / 2, 3), p))
+    return cuts
 
 
 def shift_words(words, cuts) -> list[tuple[float, float, str]]:

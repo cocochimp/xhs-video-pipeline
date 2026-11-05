@@ -154,9 +154,10 @@ def test_pace_plan_and_shift():
     assert plan == {"open": [(2, 0.6)], "body": [(2, 0.3)]}   # 开场→这期 换片；一二→三 同片
     assert pace_tag(plan["body"]) == "|pace:2:0.3"
     w = words_for("一二，三。")
-    cuts = pace_cuts("一二，三。", w, plan["body"])
-    assert cuts == [(pytest.approx(0.4), 0.3)]
-    assert [x[0] for x in shift_words(w, cuts)] == [0.0, 0.2, pytest.approx(0.7)]
+    assert pace_cuts("一二，三。", w, plan["body"]) == []                 # 句子之间没有静音：不切，免得切到字
+    cuts = pace_cuts("一二，三。", w, plan["body"], [[0.38, 0.5]])
+    assert cuts == [(pytest.approx(0.44), 0.3)]                            # 切在静音中间
+    assert [x[0] for x in shift_words(w, cuts)] == [0.0, 0.2, pytest.approx(0.4)]
 
 
 def test_snap_never_skips_a_whole_short_line():
