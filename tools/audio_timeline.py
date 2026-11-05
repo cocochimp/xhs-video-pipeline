@@ -191,6 +191,9 @@ def layout(episode: dict, seg_audio: dict, voice: dict) -> dict:
             if n == 0:
                 raise ValueError(f"场景 {sc['id']} 第 {i} 句朗读文本为空")
             start = base + snap_start(st[k], seg_audio[seg].get("silences", []))
+            nxt = base + st[k + n] if k + n < len(st) else None
+            if nxt is not None and start >= nxt - 0.05:  # 吸附越过了下一句的开头（短句后紧跟停顿），不吸附
+                start = base + st[k]
             end = max(base + en[k + n - 1], start)   # TTS 的结束时间可能和开始一样偏早
             lines.append({"scene": sc["id"], "i": i, "seg": seg, "zh": ln["zh"],
                           "start": round(start, 3), "end": round(end, 3)})

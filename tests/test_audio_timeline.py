@@ -157,3 +157,12 @@ def test_pace_plan_and_shift():
     cuts = pace_cuts("一二，三。", w, plan["body"])
     assert cuts == [(pytest.approx(0.4), 0.3)]
     assert [x[0] for x in shift_words(w, cuts)] == [0.0, 0.2, pytest.approx(0.7)]
+
+
+def test_snap_never_skips_a_whole_short_line():
+    ep = make_episode()
+    audio = fake_seg_audio(ep)
+    audio["body"]["silences"] = [[0.3, 0.5]]   # 「一二，」读完就停：开头 0.0 吸附会跳到 0.5，越过整句
+    lines = layout(ep, audio, {"speaker": "x", "rate": 15})["lines"]
+    body = [l for l in lines if l["seg"] == "body"]
+    assert body[0]["start"] < body[0]["end"] <= body[1]["start"]
